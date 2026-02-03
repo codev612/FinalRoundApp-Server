@@ -70,7 +70,7 @@ const getMongoUri = (): string => {
 };
 
 const getDbName = (): string => {
-  return process.env.MONGODB_DB_NAME || 'hearnow';
+  return process.env.MONGODB_DB_NAME || 'finalroundapp';
 };
 
 // Meeting Session type definition
