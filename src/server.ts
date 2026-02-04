@@ -1901,7 +1901,7 @@ aiWss.on('connection', (ws: WebSocket) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '127.0.0.1', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`WebSocket endpoint: ws://localhost:${PORT}/listen`);
   console.log(`AI WebSocket endpoint: ws://localhost:${PORT}/ai`);
