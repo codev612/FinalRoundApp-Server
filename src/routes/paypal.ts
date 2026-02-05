@@ -92,8 +92,20 @@ router.post('/orders/:orderID/capture', authenticate, async (req: AuthRequest, r
 router.post('/attach-subscription', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
+    const user = await getUserByIdFull(userId);
     const subscriptionId = String((req.body as any)?.subscriptionId || '').trim();
     if (!subscriptionId) return res.status(400).json({ error: 'subscriptionId is required' });
+
+    // Check if user already has an active subscription
+    const existingSubscriptionId = user?.paypal?.subscriptionId;
+    const existingStatus = user?.paypal?.status?.toUpperCase();
+    const hasActiveSubscription = existingSubscriptionId && existingStatus === 'ACTIVE';
+    
+    if (hasActiveSubscription && existingSubscriptionId !== subscriptionId) {
+      return res.status(400).json({ 
+        error: 'You already have an active subscription. Please cancel your current subscription before creating a new one.' 
+      });
+    }
 
     const sub = await getPayPalSubscription(subscriptionId);
     const status = String(sub.status || '').toUpperCase();
@@ -140,7 +152,8 @@ router.post('/cancel-subscription', authenticate, async (req: AuthRequest, res: 
     const isDowngrade = Boolean((req.body as any)?.isDowngrade);
     const isUpgrade = Boolean((req.body as any)?.isUpgrade);
     const isPlanChange = isDowngrade || isUpgrade;
-    const shouldRefund = isPlanChange && !cancelAtPeriodEnd; // Refund only for immediate plan changes (upgrade/downgrade)
+    // No refund for plan changes - they cancel at period end, so user keeps access until then
+    const shouldRefund = false;
 
     if (cancelAtPeriodEnd) {
       // Schedule cancellation at end of billing period

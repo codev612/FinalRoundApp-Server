@@ -111,7 +111,8 @@ function setRoute(route) {
     }
     const render = () => {
       if (typeof window.renderPayPalUpgradeUi === 'function') {
-        window.renderPayPalUpgradeUi(window.__currentPlanKey || null, selectedPlan);
+        const subscription = window.__lastSubscriptionData || null;
+        window.renderPayPalUpgradeUi(window.__currentPlanKey || null, selectedPlan, subscription);
       }
     };
     requestAnimationFrame(() => render());

@@ -131,7 +131,7 @@ async function renderPayPalForPlan(planKey, planId) {
   }).render(mount);
 }
 
-async function renderPayPalUpgradeUi(currentPlanKey, selectedPlan) {
+async function renderPayPalUpgradeUi(currentPlanKey, selectedPlan, subscription = null) {
   try {
     const cfg = await loadPayPalConfig();
     if (!cfg.enabled) {
@@ -142,11 +142,27 @@ async function renderPayPalUpgradeUi(currentPlanKey, selectedPlan) {
       return;
     }
 
+    // Check if user has active subscription or scheduled cancellation
+    const hasActiveSubscription = subscription && subscription.status && subscription.status.toUpperCase() === 'ACTIVE';
+    const hasScheduledCancellation = subscription && subscription.cancelAtPeriodEnd === true;
+
     const plansToRender = selectedPlan
       ? [selectedPlan]
       : ['pro', 'pro_plus'];
     for (const planKey of plansToRender) {
       if (currentPlanKey !== planKey) {
+        const note = document.getElementById(`paypalNote_${planKey}`);
+        // If user has active subscription (even with scheduled cancellation), show message
+        if (hasActiveSubscription) {
+          if (hasScheduledCancellation) {
+            if (note) note.textContent = 'Your current subscription will be cancelled at the end of your billing period. You can subscribe to this plan after your current subscription ends.';
+          } else {
+            // Shouldn't happen if flow is correct, but handle it
+            if (note) note.textContent = 'Please cancel your current subscription first before subscribing to a new plan.';
+          }
+          // Don't render PayPal button if they have active subscription
+          continue;
+        }
         await renderPayPalForPlan(planKey, cfg.planIds?.[planKey]);
       }
     }
@@ -268,14 +284,14 @@ async function performDowngrade() {
   if (cancelBtn) cancelBtn.disabled = true;
   if (msgEl) {
     msgEl.style.display = 'block';
-    msgEl.textContent = 'Cancelling current subscription…';
+    msgEl.textContent = 'Scheduling cancellation at end of billing period…';
     msgEl.style.background = '#fff3cd';
     msgEl.style.color = '#856404';
     msgEl.style.border = '1px solid #ffc107';
   }
   
   try {
-    // Cancel current subscription immediately (for plan change, we cancel immediately)
+    // Schedule cancellation at end of billing period (for plan change)
     const cancelRes = await fetch('/api/billing/paypal/cancel-subscription', {
       method: 'POST',
       headers: {
@@ -288,7 +304,7 @@ async function performDowngrade() {
           : changeType === 'upgrade'
             ? 'Upgrade to higher tier plan'
             : 'Change subscription plan',
-        cancelAtPeriodEnd: false, // Immediate cancellation for plan change
+        cancelAtPeriodEnd: true, // Cancel at end of period for plan changes
         isDowngrade: changeType === 'downgrade',
         isUpgrade: changeType === 'upgrade',
       }),
@@ -300,12 +316,9 @@ async function performDowngrade() {
     }
     
     if (msgEl) {
-      const refunded = cancelData.refunded === true;
-      let message = '✓ Current subscription cancelled.';
-      if (refunded) {
-        message += ' A refund has been processed.';
-      }
-      message += ' Redirecting to payment page…';
+      let message = '✓ Your current subscription will be cancelled at the end of your billing period.';
+      message += ' You\'ll keep access until then. After cancellation, you can create a new subscription for the new plan.';
+      message += ' Redirecting to billing page…';
       msgEl.textContent = message;
       msgEl.style.background = '#e8f5e9';
       msgEl.style.color = '#2e7d32';
@@ -317,11 +330,12 @@ async function performDowngrade() {
       await load();
     }
     
-    // Navigate to payment page for the target plan after a short delay
+    // Navigate back to billing page (user can subscribe to new plan after current one ends)
+    // We don't redirect to payment page immediately because PayPal doesn't allow overlapping subscriptions
     setTimeout(() => {
       hideDowngradeModal();
-      window.location.hash = `#payment/${targetPlan}`;
-    }, 1000);
+      window.location.hash = '#billing';
+    }, 1500);
   } catch (e) {
     if (msgEl) {
       msgEl.textContent = '✗ Failed to cancel subscription: ' + String(e.message || e);
