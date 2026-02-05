@@ -14,6 +14,8 @@ export interface User {
     status: string;
     subscriberEmail?: string | null;
     nextBillingTime?: string | null; // ISO string if available
+    cancelAtPeriodEnd?: boolean; // If true, cancel subscription when billing period ends
+    cancelScheduledAt?: number | null; // Timestamp when cancellation was scheduled
     createdAt?: number;
     updatedAt?: number;
   };
@@ -724,10 +726,51 @@ export const updatePayPalSubscriptionStatusBySubscriptionId = async (
     setObj.plan = plan;
     setObj.plan_updated_at = now;
   }
+  // Clear cancellation flags when subscription is cancelled or expired
+  if (status === 'CANCELLED' || status === 'EXPIRED') {
+    setObj['paypal.cancelAtPeriodEnd'] = false;
+    setObj['paypal.cancelScheduledAt'] = null;
+  }
   await collection.updateOne(
     { 'paypal.subscriptionId': subscriptionId } as any,
     { $set: setObj }
   );
+};
+
+export const scheduleCancelAtPeriodEnd = async (
+  userId: string,
+  subscriptionId: string
+): Promise<void> => {
+  const collection = getUsersCollection();
+  const now = Date.now();
+  await collection.updateOne(
+    { _id: new ObjectId(userId), 'paypal.subscriptionId': subscriptionId } as any,
+    {
+      $set: {
+        'paypal.cancelAtPeriodEnd': true,
+        'paypal.cancelScheduledAt': now,
+        'paypal.updatedAt': now,
+        updated_at: now,
+      },
+    }
+  );
+};
+
+export const getUserByPayPalSubscriptionId = async (subscriptionId: string): Promise<User | undefined> => {
+  const collection = getUsersCollection();
+  const user = await collection.findOne({ 'paypal.subscriptionId': subscriptionId } as any);
+  return toUser(user);
+};
+
+export const getUsersWithScheduledCancellations = async (): Promise<User[]> => {
+  const collection = getUsersCollection();
+  const users = await collection
+    .find({
+      'paypal.cancelAtPeriodEnd': true,
+      'paypal.status': 'ACTIVE',
+    } as any)
+    .toArray();
+  return users.map((u) => toUser(u)!).filter(Boolean);
 };
 
 export const setPendingEmailChange = async (

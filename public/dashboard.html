@@ -325,7 +325,7 @@
         <div class="view" id="view-billing">
           <div class="card">
             <h1>Plans</h1>
-            <div class="muted">Your current plan is highlighted. Higher tiers are available to upgrade.</div>
+            <div class="muted">Your current plan is highlighted. Click Upgrade or Downgrade to change your plan.</div>
             <div class="plans" id="plansBilling"></div>
           </div>
           <div class="card">
@@ -334,6 +334,31 @@
             <div class="error" id="invoicesError" style="display:none;"></div>
             <div class="tableWrap" style="margin-top: 12px;">
               <table class="table" id="invoicesTable"></table>
+            </div>
+          </div>
+        </div>
+
+        <div class="view" id="view-payment">
+          <div class="card">
+            <p class="muted" style="margin-bottom:14px;"><a href="#billing" style="color:#4c1d95; text-decoration:underline;">← Back to Billing &amp; invoices</a></p>
+            <h1>Subscribe with PayPal</h1>
+            <div class="muted" id="payment-plan-label" style="margin-bottom:12px;">Subscribe with your PayPal account or card.</div>
+            <div id="payment-message" style="display:none; margin-top:12px; margin-bottom:12px; padding:12px; border-radius:8px; font-weight:600;"></div>
+            <div class="paypal-button-container" style="margin-top:12px;">
+              <div id="payment-plan-pro" class="paypalWrap" style="display:none;"><span class="muted" style="display:block; margin-bottom:6px;">Pro</span><div id="paypalBtn_pro"></div><div class="muted" id="paypalNote_pro" style="margin-top:8px;"></div></div>
+              <div id="payment-plan-pro_plus" class="paypalWrap" style="display:none;"><span class="muted" style="display:block; margin-bottom:6px;">Pro+</span><div id="paypalBtn_pro_plus"></div><div class="muted" id="paypalNote_pro_plus" style="margin-top:8px;"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="view" id="view-manage">
+          <div class="card">
+            <p class="muted" style="margin-bottom:14px;"><a href="#billing" style="color:#4c1d95; text-decoration:underline;">← Back to Billing &amp; invoices</a></p>
+            <h1>Manage Subscription</h1>
+            <div class="muted" id="subscription-info">Loading subscription details…</div>
+            <div id="subscription-message" style="display:none; margin-top:12px; padding:12px; border-radius:8px; font-weight:600;"></div>
+            <div style="margin-top:12px;">
+              <button type="button" id="cancel-subscription-btn" class="btn btn-danger btn-sm" style="display:none;">Cancel Subscription</button>
             </div>
           </div>
         </div>
@@ -364,6 +389,35 @@
     </main>
   </div>
 
+  <!-- Cancel Subscription Confirmation Modal -->
+  <div id="cancel-subscription-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background:#1e1b4b; border-radius:16px; padding:24px; max-width:480px; width:90%; margin:20px; box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+      <h2 style="margin:0 0 16px 0; font-size:20px; font-weight:800; color:white;">Cancel Subscription</h2>
+      <p style="margin:0 0 24px 0; color:rgba(255,255,255,0.8); line-height:1.6;">
+        Your subscription will be cancelled at the end of your current billing period. You'll keep access to premium features until then, and no further charges will be made.
+      </p>
+      <div style="display:flex; gap:12px; justify-content:flex-end;">
+        <button type="button" id="cancel-modal-cancel-btn" class="btn btn-ghost btn-sm" style="min-width:100px;">Cancel</button>
+        <button type="button" id="cancel-modal-confirm-btn" class="btn btn-danger btn-sm" style="min-width:100px;">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Plan Change (Upgrade/Downgrade) Confirmation Modal -->
+  <div id="downgrade-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background:#1e1b4b; border-radius:16px; padding:24px; max-width:480px; width:90%; margin:20px; box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+      <h2 style="margin:0 0 16px 0; font-size:20px; font-weight:800; color:white;">Change Subscription Plan</h2>
+      <p style="margin:0 0 24px 0; color:rgba(255,255,255,0.8); line-height:1.6;">
+        To change plans, we need to cancel your current subscription first. Your current subscription will be cancelled immediately, and then you can subscribe to the new plan.
+      </p>
+      <div id="downgrade-message" style="display:none; margin-bottom:20px; padding:12px; border-radius:8px; font-weight:600;"></div>
+      <div style="display:flex; gap:12px; justify-content:flex-end;">
+        <button type="button" id="downgrade-modal-cancel-btn" class="btn btn-ghost btn-sm" style="min-width:100px;">Cancel</button>
+        <button type="button" id="downgrade-modal-confirm-btn" class="btn btn-primary btn-sm" style="min-width:100px;">Continue</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/js/dashboard/plans.js" defer></script>
   <script src="/js/dashboard/charts.js" defer></script>
   <script src="/js/dashboard/tables.js" defer></script>
@@ -373,4 +427,3 @@
   <script src="/js/dashboard/main.js" defer></script>
 </body>
 </html>
-

@@ -509,6 +509,13 @@ app.get('/api/billing/me', authenticate, async (req: AuthRequest, res: Response)
         email: (user as any)?.email || (req.user?.email || ''),
       },
       plan: ent.plan,
+      subscription: user?.paypal ? {
+        subscriptionId: user.paypal.subscriptionId,
+        status: user.paypal.status,
+        nextBillingTime: user.paypal.nextBillingTime,
+        cancelAtPeriodEnd: user.paypal.cancelAtPeriodEnd || false,
+        cancelScheduledAt: user.paypal.cancelScheduledAt || null,
+      } : null,
       billingPeriod: {
         start: start.toISOString(),
         end: end.toISOString(),

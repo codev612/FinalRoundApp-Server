@@ -84,6 +84,82 @@ export async function getPayPalSubscription(subscriptionId: string): Promise<Pay
   });
 }
 
+/**
+ * Cancel a PayPal subscription.
+ * @see https://developer.paypal.com/docs/api/subscriptions/v1/#subscriptions_cancel
+ */
+export async function cancelPayPalSubscription(subscriptionId: string, reason?: string): Promise<void> {
+  const id = String(subscriptionId || '').trim();
+  if (!id) throw new Error('subscriptionId is required');
+  await paypalApi(`/v1/billing/subscriptions/${encodeURIComponent(id)}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({
+      reason: reason || 'User requested cancellation',
+    }),
+  });
+}
+
+// --- Orders v2 (advanced checkout: create order + capture) ---
+
+export type PayPalOrderCreatePayload = {
+  intent: 'CAPTURE';
+  purchase_units: Array<{
+    amount: { currency_code: string; value: string };
+    description?: string;
+    reference_id?: string;
+  }>;
+};
+
+export type PayPalOrder = {
+  id: string;
+  status: string;
+  purchase_units?: Array<{
+    payments?: {
+      captures?: Array<{ id: string; status: string }>;
+      authorizations?: Array<{ id: string; status: string }>;
+    };
+  }>;
+  details?: Array<{ issue: string; description: string }>;
+  debug_id?: string;
+};
+
+/**
+ * Create an order (Orders v2) for one-time checkout.
+ * @see https://developer.paypal.com/docs/api/orders/v2/#orders_create
+ */
+export async function createPayPalOrder(cart?: { amount?: string; currency_code?: string }[]): Promise<PayPalOrder> {
+  const amount = (Array.isArray(cart) && cart.length > 0 && cart[0]?.amount)
+    ? String(cart[0].amount)
+    : '100.00';
+  const currencyCode = (Array.isArray(cart) && cart.length > 0 && cart[0]?.currency_code)
+    ? String(cart[0].currency_code).toUpperCase()
+    : 'USD';
+  const body: PayPalOrderCreatePayload = {
+    intent: 'CAPTURE',
+    purchase_units: [
+      {
+        amount: { currency_code: currencyCode, value: amount },
+      },
+    ],
+  };
+  return await paypalApi<PayPalOrder>('/v2/checkout/orders', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Capture payment for an order (Orders v2).
+ * @see https://developer.paypal.com/docs/api/orders/v2/#orders_capture
+ */
+export async function capturePayPalOrder(orderId: string): Promise<PayPalOrder> {
+  const id = String(orderId || '').trim();
+  if (!id) throw new Error('orderId is required');
+  return await paypalApi<PayPalOrder>(`/v2/checkout/orders/${encodeURIComponent(id)}/capture`, {
+    method: 'POST',
+  });
+}
+
 export async function verifyPayPalWebhookSignature(args: {
   transmissionId: string;
   transmissionTime: string;
@@ -109,5 +185,99 @@ export async function verifyPayPalWebhookSignature(args: {
     }),
   });
   return String(data?.verification_status || '').toUpperCase() === 'SUCCESS';
+}
+
+/**
+ * Get subscription transactions.
+ * @see https://developer.paypal.com/docs/api/subscriptions/v1/#subscriptions_transactions
+ */
+export async function getPayPalSubscriptionTransactions(
+  subscriptionId: string,
+  startTime?: string,
+  endTime?: string
+): Promise<{
+  transactions?: Array<{
+    id?: string;
+    status?: string;
+    amount_with_breakdown?: {
+      gross_amount?: { currency_code?: string; value?: string };
+    };
+    payer_name?: { given_name?: string; surname?: string };
+    time?: string;
+  }>;
+}> {
+  const id = String(subscriptionId || '').trim();
+  if (!id) throw new Error('subscriptionId is required');
+  
+  const params = new URLSearchParams();
+  if (startTime) params.append('start_time', startTime);
+  if (endTime) params.append('end_time', endTime);
+  
+  const query = params.toString();
+  const url = `/v1/billing/subscriptions/${encodeURIComponent(id)}/transactions${query ? '?' + query : ''}`;
+  
+  return await paypalApi(url, {
+    method: 'GET',
+  });
+}
+
+/**
+ * Get the last completed payment capture_id from a subscription.
+ */
+export async function getLastSubscriptionCaptureId(subscriptionId: string): Promise<string | null> {
+  try {
+    // Get transactions from the last 30 days
+    const endTime = new Date().toISOString();
+    const startTime = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    
+    const transactions = await getPayPalSubscriptionTransactions(subscriptionId, startTime, endTime);
+    const txns = transactions?.transactions || [];
+    
+    // Find the last completed payment transaction
+    // PayPal subscription transactions have the capture_id in the transaction id
+    // We need to find a COMPLETED transaction
+    for (let i = txns.length - 1; i >= 0; i--) {
+      const txn = txns[i];
+      if (txn?.status === 'COMPLETED' && txn?.id) {
+        // The transaction id is the capture_id for subscription payments
+        return txn.id;
+      }
+    }
+    
+    return null;
+  } catch (error: any) {
+    console.error(`Failed to get last capture_id for subscription ${subscriptionId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Refund a PayPal capture.
+ * @see https://developer.paypal.com/docs/api/payments/v2/#captures_refund
+ */
+export async function refundPayPalCapture(
+  captureId: string,
+  amount?: { currency_code?: string; value?: string },
+  note?: string
+): Promise<{
+  id?: string;
+  status?: string;
+  amount?: { currency_code?: string; value?: string };
+}> {
+  const id = String(captureId || '').trim();
+  if (!id) throw new Error('captureId is required');
+  
+  const body: any = {};
+  if (amount) {
+    body.amount = amount;
+  }
+  if (note) {
+    body.note_to_payer = note;
+  }
+  
+  return await paypalApi(`/v2/payments/captures/${encodeURIComponent(id)}/refund`, {
+    method: 'POST',
+    body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
+  });
 }
 

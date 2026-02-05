@@ -1,17 +1,42 @@
-function renderPlansInto(containerId, currentPlanKey) {
+function renderPlansInto(containerId, currentPlanKey, subscription = null) {
   const plansEl = $(containerId);
   if (!plansEl) return;
-  const curIdx = planOffers.findIndex(p => p.key === currentPlanKey);
   plansEl.innerHTML = '';
+  const currentIdx = planOffers.findIndex(p => p.key === currentPlanKey);
   planOffers.forEach((p, idx) => {
-    if (idx < curIdx) return; // only show current + upgradable
     const isCurrent = p.key === currentPlanKey;
     const div = document.createElement('div');
     div.className = 'plan' + (isCurrent ? ' current' : '');
     const isBilling = containerId === 'plansBilling';
-    const paypalSlot = (!isCurrent && isBilling)
-      ? `<div class="paypalWrap"><div id="paypalBtn_${p.key}"></div><div class="muted" id="paypalNote_${p.key}" style="margin-top:8px;"></div></div>`
-      : '';
+    let actionBtn = '';
+    if (isCurrent && isBilling) {
+      // Show Manage button for paid plans with active subscription
+      const isPaidPlan = currentPlanKey === 'pro' || currentPlanKey === 'pro_plus';
+      const hasActiveSubscription = subscription && subscription.status && subscription.status.toUpperCase() === 'ACTIVE';
+      if (isPaidPlan && hasActiveSubscription) {
+        actionBtn = `<div class="paypalWrap" style="margin-top:10px;"><a href="#manage" class="btn btn-primary btn-sm">Manage</a></div>`;
+      }
+    } else if (!isCurrent && isBilling) {
+      const hasActiveSubscription = subscription && subscription.status && subscription.status.toUpperCase() === 'ACTIVE';
+      if (idx < currentIdx) {
+        // Lower tier plan - show Downgrade
+        if (hasActiveSubscription) {
+          // If user has active subscription, use data attribute to trigger plan-change flow
+          actionBtn = `<div class="paypalWrap" style="margin-top:10px;"><a href="#payment/${p.key}" class="btn btn-light btn-sm" data-plan-change="downgrade" data-target-plan="${p.key}">Downgrade</a></div>`;
+        } else {
+          // No active subscription, just navigate normally
+          actionBtn = `<div class="paypalWrap" style="margin-top:10px;"><a href="#payment/${p.key}" class="btn btn-light btn-sm">Downgrade</a></div>`;
+        }
+      } else {
+        // Higher tier plan - show Upgrade
+        if (hasActiveSubscription) {
+          // Active subscription: treat upgrade as plan change (cancel + new sub)
+          actionBtn = `<div class="paypalWrap" style="margin-top:10px;"><a href="#payment/${p.key}" class="btn btn-primary btn-sm" data-plan-change="upgrade" data-target-plan="${p.key}">Upgrade</a></div>`;
+        } else {
+          actionBtn = `<div class="paypalWrap" style="margin-top:10px;"><a href="#payment/${p.key}" class="btn btn-primary btn-sm">Upgrade</a></div>`;
+        }
+      }
+    }
     div.innerHTML = `
           <div class="name">${p.name}${isCurrent ? '<span class="badge">Current</span>' : ''}</div>
           <ul>
@@ -20,7 +45,7 @@ function renderPlansInto(containerId, currentPlanKey) {
             <li>${fmt(p.requests)} AI requests / month</li>
             <li>Summary: ${p.summary ? 'enabled' : 'not included'}</li>
           </ul>
-          ${paypalSlot}
+          ${actionBtn}
         `;
     plansEl.appendChild(div);
   });
@@ -30,7 +55,7 @@ function setKpi(prefix, data) {
   const t = data.transcription || {};
   const a = data.ai || {};
   const plan = String(data.plan || 'free');
-  const planUpper = plan.toUpperCase();
+  const planDisplay = formatPlanName(plan);
 
   const planEl = $(prefix + 'planValue');
   const minutesEl = $(prefix + 'minutesValue');
@@ -38,7 +63,7 @@ function setKpi(prefix, data) {
   const tokensEl = $(prefix + 'tokensValue');
   const tokensBarEl = $(prefix + 'tokensBar');
 
-  if (planEl) planEl.textContent = planUpper;
+  if (planEl) planEl.textContent = planDisplay;
   if (minutesEl) minutesEl.textContent = fmt(t.remainingMinutes) + ' min';
   if (minutesBarEl) {
     const minPct = t.limitMinutes ? (100 * (t.usedMinutes / t.limitMinutes)) : 0;

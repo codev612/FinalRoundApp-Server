@@ -288,3 +288,7 @@
   padding: 14px;
   color: #333;
 }
+
+.modal-overlay {
+  display: flex;
+}

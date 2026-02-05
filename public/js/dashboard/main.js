@@ -5,11 +5,26 @@ function routeMeta(route) {
     case 'profile': return { title: 'Profile', sub: 'Update your account details' };
     case 'settings': return { title: 'Settings', sub: 'Preferences and account settings' };
     case 'spending': return { title: 'Spending', sub: 'Costs and usage spend' };
-    case 'billing': return { title: 'Billing & invoices', sub: 'Payment method and invoices' };
+    case 'billing': return { title: 'Billing & invoices', sub: 'Plans and invoices' };
+    case 'payment': return { title: 'Payment', sub: 'Subscribe with PayPal' };
+    case 'manage': return { title: 'Manage Subscription', sub: 'Manage your current subscription' };
     case 'docs': return { title: 'Docs', sub: 'Product and API documentation' };
     case 'contact': return { title: 'Contact us', sub: 'Get help from support' };
     default: return { title: 'Overview', sub: 'Plan snapshot and quick actions' };
   }
+}
+
+function routeFromHash() {
+  const h = (window.location.hash || '').replace('#', '').trim();
+  if (h === 'payment' || h.startsWith('payment/')) return 'payment';
+  return h || 'overview';
+}
+
+function paymentPageSelectedPlan() {
+  const h = (window.location.hash || '').replace('#', '').trim();
+  if (h === 'payment/pro') return 'pro';
+  if (h === 'payment/pro_plus') return 'pro_plus';
+  return null;
 }
 
 function setRoute(route) {
@@ -22,6 +37,11 @@ function setRoute(route) {
   document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
   const link = document.querySelector(`.nav a[data-route="${r}"]`);
   if (link) link.classList.add('active');
+  // Payment and manage pages have no nav item; keep billing highlighted when on these pages
+  if (r === 'payment' || r === 'manage') {
+    const billingLink = document.querySelector('.nav a[data-route="billing"]');
+    if (billingLink) billingLink.classList.add('active');
+  }
 
   const meta = routeMeta(r);
   const pageTitle = $('pageTitle');
@@ -57,10 +77,44 @@ function setRoute(route) {
 
   if (r === 'billing') {
     loadInvoicesTable();
-    if (typeof window.renderPayPalUpgradeUi === 'function') {
-      // Render PayPal buttons once billing view is visible.
-      window.renderPayPalUpgradeUi(window.__currentPlanKey || null);
+  }
+
+  if (r === 'manage') {
+    // Ensure billing info is loaded (load() will automatically render subscription management)
+    if (!billingInfoLoaded) {
+      load();
+    } else if (typeof window.renderSubscriptionManagement === 'function') {
+      // Already loaded, just render with current data
+      const subscription = window.__lastSubscriptionData || null;
+      const planKey = window.__currentPlanKey || 'free';
+      requestAnimationFrame(() => {
+        window.renderSubscriptionManagement(subscription, planKey);
+      });
     }
+  }
+
+  if (r === 'payment') {
+    const selectedPlan = paymentPageSelectedPlan() || 'pro';
+    const proEl = document.getElementById('payment-plan-pro');
+    const proPlusEl = document.getElementById('payment-plan-pro_plus');
+    const labelEl = document.getElementById('payment-plan-label');
+    const msgEl = document.getElementById('payment-message');
+    if (proEl) proEl.style.display = selectedPlan === 'pro' ? 'block' : 'none';
+    if (proPlusEl) proPlusEl.style.display = selectedPlan === 'pro_plus' ? 'block' : 'none';
+    if (labelEl) labelEl.textContent = 'Subscribe with your PayPal account or card.';
+    if (msgEl) msgEl.style.display = 'none';
+    // Clear container so PayPal re-renders into visible element (SDK often fails when container was hidden)
+    const mount = document.getElementById('paypalBtn_' + selectedPlan);
+    if (mount) {
+      mount.innerHTML = '';
+      mount.removeAttribute('data-rendered');
+    }
+    const render = () => {
+      if (typeof window.renderPayPalUpgradeUi === 'function') {
+        window.renderPayPalUpgradeUi(window.__currentPlanKey || null, selectedPlan);
+      }
+    };
+    requestAnimationFrame(() => render());
   }
 }
 
@@ -119,9 +173,18 @@ async function load() {
     const planKey = String(data.plan || 'free');
     window.__currentPlanKey = planKey;
     renderPlansInto('plansOverview', planKey);
-    renderPlansInto('plansBilling', planKey);
-    if (typeof window.renderPayPalUpgradeUi === 'function') {
-      window.renderPayPalUpgradeUi(planKey);
+    renderPlansInto('plansBilling', planKey, data.subscription || null);
+    if (currentRoute === 'payment' && typeof window.renderPayPalUpgradeUi === 'function') {
+      const selectedPlan = paymentPageSelectedPlan() || 'pro';
+      window.renderPayPalUpgradeUi(planKey, selectedPlan);
+    }
+    
+    // Store subscription data for manage page
+    window.__lastSubscriptionData = data.subscription || null;
+    
+    // Render subscription management UI on manage page
+    if (currentRoute === 'manage' && typeof window.renderSubscriptionManagement === 'function') {
+      window.renderSubscriptionManagement(data.subscription || null, planKey);
     }
 
     // Spending view snapshot
@@ -323,10 +386,6 @@ async function load() {
   }
 
   // Sidebar navigation + route switching
-  function routeFromHash() {
-    const h = (window.location.hash || '').replace('#', '').trim();
-    return h || 'overview';
-  }
   window.addEventListener('hashchange', () => {
     setRoute(routeFromHash());
     setSidebarOpen(false);
@@ -397,7 +456,6 @@ async function load() {
       const a = e.target.closest('a[data-route]');
       const quick = e.target.closest('a[data-route-link]');
       if (a) {
-        // Allow hash navigation; route handler will switch view.
         setSidebarOpen(false);
         return;
       }

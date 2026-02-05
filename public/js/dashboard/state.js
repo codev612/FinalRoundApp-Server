@@ -94,3 +94,10 @@ function clearErrors() {
   if (e2) e2.style.display = 'none';
   if (e3) e3.style.display = 'none';
 }
+
+function formatPlanName(planKey) {
+  if (planKey === 'pro_plus') return 'Pro plus';
+  if (planKey === 'pro') return 'Pro';
+  if (planKey === 'free') return 'Free';
+  return planKey;
+}
