@@ -75,6 +75,27 @@ const getDbName = (): string => {
   return process.env.MONGODB_DB_NAME || 'finalroundapp';
 };
 
+// Payment Transaction type definition
+export interface PaymentTransaction {
+  _id?: ObjectId;
+  id?: string; // For backward compatibility, will be _id.toString()
+  userId: string; // User who made this payment
+  subscriptionId?: string | null; // PayPal subscription ID if this is a subscription payment
+  transactionId: string; // PayPal transaction ID (sale_id, capture_id, etc.)
+  transactionType: 'payment' | 'refund'; // Type of transaction
+  status: 'completed' | 'pending' | 'denied' | 'refunded' | 'partially_refunded'; // Transaction status
+  amount: {
+    value: string; // Amount as string (e.g., "9.99")
+    currency: string; // Currency code (e.g., "USD")
+  };
+  plan?: 'pro' | 'pro_plus' | null; // Plan associated with this payment
+  description?: string | null; // Description of the payment
+  paypalEventType?: string | null; // PayPal webhook event type (e.g., "PAYMENT.SALE.COMPLETED")
+  paypalResource?: Record<string, any> | null; // Full PayPal resource data for reference
+  createdAt: number; // Timestamp when transaction occurred
+  updatedAt?: number; // Timestamp when transaction was last updated
+}
+
 // Meeting Session type definition
 export interface MeetingSession {
   _id?: ObjectId;
@@ -193,6 +214,7 @@ let questionTemplatesCollection: Collection<QuestionTemplatesDoc> | null = null;
 let authSessionsCollection: Collection<AuthSession> | null = null;
 let trustedDevicesCollection: Collection<TrustedDevice> | null = null;
 let loginChallengesCollection: Collection<LoginChallenge> | null = null;
+let paymentTransactionsCollection: Collection<PaymentTransaction> | null = null;
 
 // Initialize MongoDB connection
 export const connectDB = async (): Promise<void> => {
@@ -266,6 +288,13 @@ export const connectDB = async (): Promise<void> => {
       await loginChallengesCollection.createIndex({ userId: 1, createdAt: -1 });
       await loginChallengesCollection.createIndex({ expiresAt: 1 });
       await loginChallengesCollection.createIndex({ usedAt: 1 });
+    }
+
+    if (!paymentTransactionsCollection) {
+      paymentTransactionsCollection = db.collection<PaymentTransaction>('payment_transactions');
+      await paymentTransactionsCollection.createIndex({ userId: 1, createdAt: -1 });
+      await paymentTransactionsCollection.createIndex({ subscriptionId: 1 });
+      await paymentTransactionsCollection.createIndex({ transactionId: 1 }, { unique: true });
     }
 
     // Usage tracking collections (indexes only; collection handles are created on demand)
@@ -1622,6 +1651,97 @@ export const setUserPlan = async (userId: string, plan: 'free' | 'pro' | 'pro_pl
     { _id: new ObjectId(userId) },
     { $set: { plan, plan_updated_at: Date.now(), updated_at: Date.now() } }
   );
+};
+
+// Payment Transaction functions
+const getPaymentTransactionsCollection = (): Collection<PaymentTransaction> => {
+  if (!paymentTransactionsCollection) {
+    throw new Error('Database not initialized. Call connectDB() first.');
+  }
+  return paymentTransactionsCollection;
+};
+
+/**
+ * Store a payment transaction from PayPal webhook
+ */
+export const storePaymentTransaction = async (transaction: {
+  userId: string;
+  subscriptionId?: string | null;
+  transactionId: string;
+  transactionType: 'payment' | 'refund';
+  status: 'completed' | 'pending' | 'denied' | 'refunded' | 'partially_refunded';
+  amount: { value: string; currency: string };
+  plan?: 'pro' | 'pro_plus' | null;
+  description?: string | null;
+  paypalEventType?: string | null;
+  paypalResource?: Record<string, any> | null;
+}): Promise<PaymentTransaction> => {
+  await connectDB();
+  const collection = getPaymentTransactionsCollection();
+  const now = Date.now();
+  
+  // Check if transaction already exists (idempotency)
+  const existing = await collection.findOne({ transactionId: transaction.transactionId });
+  if (existing) {
+    // Update if status changed (e.g., pending -> completed, or refund)
+    if (existing.status !== transaction.status) {
+      await collection.updateOne(
+        { transactionId: transaction.transactionId },
+        { 
+          $set: { 
+            status: transaction.status,
+            updatedAt: now,
+            ...(transaction.paypalResource ? { paypalResource: transaction.paypalResource } : {}),
+          } 
+        }
+      );
+      return (await collection.findOne({ transactionId: transaction.transactionId }))!;
+    }
+    return existing;
+  }
+  
+  const doc: PaymentTransaction = {
+    userId: transaction.userId,
+    subscriptionId: transaction.subscriptionId || null,
+    transactionId: transaction.transactionId,
+    transactionType: transaction.transactionType,
+    status: transaction.status,
+    amount: transaction.amount,
+    plan: transaction.plan || null,
+    description: transaction.description || null,
+    paypalEventType: transaction.paypalEventType || null,
+    paypalResource: transaction.paypalResource || null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  
+  const result = await collection.insertOne(doc);
+  return {
+    ...doc,
+    _id: result.insertedId,
+    id: result.insertedId.toString(),
+  };
+};
+
+/**
+ * Get payment transactions for a user, ordered by most recent first
+ */
+export const getUserPaymentTransactions = async (
+  userId: string,
+  limit: number = 50
+): Promise<PaymentTransaction[]> => {
+  await connectDB();
+  const collection = getPaymentTransactionsCollection();
+  const transactions = await collection
+    .find({ userId })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .toArray();
+  
+  return transactions.map(tx => ({
+    ...tx,
+    id: tx._id?.toString() || '',
+  }));
 };
 
 export default { connectDB, closeDB, getUsersCollection };

@@ -16,6 +16,8 @@ import {
   scheduleCancelAtPeriodEnd,
   getUsersWithScheduledCancellations,
   getUserByPayPalSubscriptionId,
+  storePaymentTransaction,
+  getUserPaymentTransactions,
 } from '../database.js';
 import {
   sendSubscriptionCancelledEmail,
@@ -153,6 +155,58 @@ router.post('/attach-subscription', authenticate, async (req: AuthRequest, res: 
 });
 
 /** Cancel the user's current PayPal subscription. */
+// Get user's payment transaction history
+router.get('/transactions', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const limit = parseInt(String((req.query as any)?.limit || '50'), 10);
+    const transactions = await getUserPaymentTransactions(userId, Math.min(limit, 100)); // Max 100
+    
+    return res.json({
+      transactions: transactions.map(tx => ({
+        id: tx.id,
+        transactionId: tx.transactionId,
+        transactionType: tx.transactionType,
+        status: tx.status,
+        amount: tx.amount,
+        plan: tx.plan,
+        description: tx.description,
+        createdAt: tx.createdAt,
+        updatedAt: tx.updatedAt,
+      })),
+      count: transactions.length,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message || 'Failed to fetch transactions' });
+  }
+});
+
+// Get user's payment transaction history
+router.get('/transactions', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const limit = parseInt(String((req.query as any)?.limit || '50'), 10);
+    const transactions = await getUserPaymentTransactions(userId, Math.min(limit, 100)); // Max 100
+    
+    return res.json({
+      transactions: transactions.map(tx => ({
+        id: tx.id,
+        transactionId: tx.transactionId,
+        transactionType: tx.transactionType,
+        status: tx.status,
+        amount: tx.amount,
+        plan: tx.plan,
+        description: tx.description,
+        createdAt: tx.createdAt,
+        updatedAt: tx.updatedAt,
+      })),
+      count: transactions.length,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message || 'Failed to fetch transactions' });
+  }
+});
+
 router.post('/cancel-subscription', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
@@ -504,6 +558,88 @@ router.post('/webhook', async (req, res: Response) => {
         console.log(`[Webhook ${webhookId}] ✓ Billing cycle completed, updated next billing time`);
         // Broadcast plan update (subscription info may have changed)
         await broadcastPlanUpdateIfNeeded();
+      } else if (eventType.includes('PAYMENT.SALE.COMPLETED') || eventType.includes('PAYMENT.CAPTURE.COMPLETED')) {
+        // Store payment transaction
+        console.log(`[Webhook ${webhookId}] Processing PAYMENT event...`);
+        if (user?._id) {
+          try {
+            const saleId = String(resource?.id || resource?.sale_id || '').trim();
+            const captureId = String(resource?.id || resource?.capture_id || '').trim();
+            const transactionId = saleId || captureId;
+            
+            if (transactionId) {
+              const amount = resource?.amount || {};
+              const amountValue = String(amount?.value || amount?.total || '0');
+              const amountCurrency = String(amount?.currency_code || amount?.currency || 'USD');
+              
+              // Get plan description
+              const planName = tier ? (tier === 'pro_plus' ? 'Pro Plus' : 'Pro') : 'Subscription';
+              const description = `${planName} subscription payment`;
+              
+              await storePaymentTransaction({
+                userId: user._id.toString(),
+                subscriptionId: subscriptionId || null,
+                transactionId,
+                transactionType: 'payment',
+                status: 'completed',
+                amount: {
+                  value: amountValue,
+                  currency: amountCurrency,
+                },
+                plan: tier || null,
+                description,
+                paypalEventType: eventType,
+                paypalResource: resource,
+              });
+              console.log(`[Webhook ${webhookId}] ✓ Payment transaction stored: ${transactionId}`);
+            } else {
+              console.warn(`[Webhook ${webhookId}] ⚠ No transaction ID found in payment event`);
+            }
+          } catch (txError: any) {
+            console.error(`[Webhook ${webhookId}] ✗ Failed to store payment transaction:`, txError);
+          }
+        }
+      } else if (eventType.includes('PAYMENT.CAPTURE.REFUNDED') || eventType.includes('PAYMENT.SALE.REFUNDED')) {
+        // Store refund transaction
+        console.log(`[Webhook ${webhookId}] Processing REFUND event...`);
+        if (user?._id) {
+          try {
+            const refundId = String(resource?.id || '').trim();
+            const captureId = String(resource?.capture_id || resource?.parent_payment || '').trim();
+            const saleId = String(resource?.sale_id || '').trim();
+            const transactionId = refundId || captureId || saleId;
+            
+            if (transactionId) {
+              const amount = resource?.amount || {};
+              const amountValue = String(amount?.value || amount?.total || '0');
+              const amountCurrency = String(amount?.currency_code || amount?.currency || 'USD');
+              
+              // Determine refund status
+              const refundStatus = resource?.status === 'PARTIALLY_REFUNDED' ? 'partially_refunded' : 'refunded';
+              
+              await storePaymentTransaction({
+                userId: user._id.toString(),
+                subscriptionId: subscriptionId || null,
+                transactionId: `refund_${transactionId}_${Date.now()}`, // Unique ID for refund
+                transactionType: 'refund',
+                status: refundStatus,
+                amount: {
+                  value: amountValue,
+                  currency: amountCurrency,
+                },
+                plan: tier || null,
+                description: 'Subscription refund',
+                paypalEventType: eventType,
+                paypalResource: resource,
+              });
+              console.log(`[Webhook ${webhookId}] ✓ Refund transaction stored: ${transactionId}`);
+            } else {
+              console.warn(`[Webhook ${webhookId}] ⚠ No transaction ID found in refund event`);
+            }
+          } catch (txError: any) {
+            console.error(`[Webhook ${webhookId}] ✗ Failed to store refund transaction:`, txError);
+          }
+        }
       } else {
         console.log(`[Webhook ${webhookId}] Processing other event (${eventType})...`);
         // For other events, update status but be careful about plan changes

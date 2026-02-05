@@ -81,6 +81,42 @@ function fmtMoneyCents(cents, currency) {
   }
 }
 
+function fmtMoney(value, currency) {
+  const cur = (currency || 'USD').toUpperCase();
+  const v = Number(value || 0) || 0;
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(v);
+  } catch (_) {
+    return cur + ' ' + v.toFixed(2);
+  }
+}
+
+function formatDate(timestamp) {
+  if (!timestamp) return '—';
+  try {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch (_) {
+    return String(timestamp);
+  }
+}
+
+function formatStatus(status, transactionType) {
+  const s = String(status || '').toLowerCase();
+  const type = String(transactionType || '').toLowerCase();
+  
+  if (type === 'refund') {
+    if (s === 'refunded') return '<span style="color:#dc2626;">Refunded</span>';
+    if (s === 'partially_refunded') return '<span style="color:#ea580c;">Partially Refunded</span>';
+  }
+  
+  if (s === 'completed') return '<span style="color:#16a34a;">Completed</span>';
+  if (s === 'pending') return '<span style="color:#ca8a04;">Pending</span>';
+  if (s === 'denied') return '<span style="color:#dc2626;">Denied</span>';
+  
+  return String(status || '—');
+}
+
 async function loadInvoicesTable() {
   const table = $('invoicesTable');
   const errEl = $('invoicesError');
@@ -88,21 +124,21 @@ async function loadInvoicesTable() {
   if (!table) return;
   table.innerHTML = '<tr><td>Loading…</td></tr>';
   try {
-    const res = await fetch('/api/billing/invoices', {
+    const res = await fetch('/api/billing/paypal/transactions', {
       headers: { 'Authorization': 'Bearer ' + token }
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || data.message || ('HTTP ' + res.status));
 
-    const rows = Array.isArray(data.invoices) ? data.invoices : [];
+    const rows = Array.isArray(data.transactions) ? data.transactions : [];
     table.innerHTML = `
           <thead>
             <tr>
               <th>Date</th>
+              <th>Type</th>
               <th>Description</th>
               <th>Status</th>
               <th class="num">Amount</th>
-              <th>Invoice</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -110,28 +146,25 @@ async function loadInvoicesTable() {
     const tbody = table.querySelector('tbody');
     if (!rows.length) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="5" style="color:#555;">No invoices yet.</td>`;
+      tr.innerHTML = `<td colspan="5" style="color:#555; text-align:center; padding:24px;">No payment history yet.</td>`;
       tbody.appendChild(tr);
       return;
     }
-    for (const inv of rows) {
-      const date = String(inv.date || '');
-      const desc = String(inv.description || '');
-      const status = String(inv.status || '');
-      const amountCents = Number(inv.amountCents || 0) || 0;
-      const currency = String(inv.currency || 'USD');
-      const url = inv.invoiceUrl ? String(inv.invoiceUrl) : '';
-      const view = url
-        ? `<a href="${url}" target="_blank" rel="noopener" style="color:#4c1d95; text-decoration: underline;">View</a>`
-        : `<span style="color:#777;">—</span>`;
+    for (const tx of rows) {
+      const date = formatDate(tx.createdAt);
+      const type = String(tx.transactionType || '').toUpperCase();
+      const desc = String(tx.description || 'Payment');
+      const status = formatStatus(tx.status, tx.transactionType);
+      const amount = tx.amount ? fmtMoney(tx.amount.value, tx.amount.currency) : '—';
+      const typeLabel = type === 'REFUND' ? '<span style="color:#dc2626;">Refund</span>' : '<span style="color:#16a34a;">Payment</span>';
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
             <td>${date}</td>
+            <td>${typeLabel}</td>
             <td>${desc}</td>
             <td>${status}</td>
-            <td class="num">${fmtMoneyCents(amountCents, currency)}</td>
-            <td>${view}</td>
+            <td class="num">${amount}</td>
           `;
       tbody.appendChild(tr);
     }
