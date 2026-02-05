@@ -24,6 +24,7 @@ import {
   sendPaymentFailedEmail,
   sendSubscriptionActivatedEmail,
 } from '../emailService.js';
+import { broadcastPlanUpdate } from '../sessionBus.js';
 
 const router = express.Router();
 
@@ -125,6 +126,21 @@ router.post('/attach-subscription', authenticate, async (req: AuthRequest, res: 
       nextBillingTime: String(sub?.billing_info?.next_billing_time || '').trim() || null,
     });
 
+    // Fetch updated user to broadcast plan update
+    const updatedUser = await getUserByIdFull(userId);
+    if (updatedUser) {
+      broadcastPlanUpdate(userId, {
+        plan: updatedUser.plan || 'free',
+        subscription: updatedUser.paypal ? {
+          subscriptionId: updatedUser.paypal.subscriptionId || null,
+          status: updatedUser.paypal.status || null,
+          nextBillingTime: updatedUser.paypal.nextBillingTime || null,
+          cancelAtPeriodEnd: updatedUser.paypal.cancelAtPeriodEnd || false,
+          cancelScheduledAt: updatedUser.paypal.cancelScheduledAt || null,
+        } : null,
+      });
+    }
+
     return res.json({
       message: 'Subscription attached successfully.',
       plan: tier,
@@ -159,6 +175,21 @@ router.post('/cancel-subscription', authenticate, async (req: AuthRequest, res: 
       // Schedule cancellation at end of billing period
       const { scheduleCancelAtPeriodEnd } = await import('../database.js');
       await scheduleCancelAtPeriodEnd(userId, subscriptionId);
+      
+      // Fetch updated user to broadcast plan update
+      const updatedUser = await getUserByIdFull(userId);
+      if (updatedUser) {
+        broadcastPlanUpdate(userId, {
+          plan: updatedUser.plan || 'free',
+          subscription: updatedUser.paypal ? {
+            subscriptionId: updatedUser.paypal.subscriptionId || null,
+            status: updatedUser.paypal.status || null,
+            nextBillingTime: updatedUser.paypal.nextBillingTime || null,
+            cancelAtPeriodEnd: updatedUser.paypal.cancelAtPeriodEnd || false,
+            cancelScheduledAt: updatedUser.paypal.cancelScheduledAt || null,
+          } : null,
+        });
+      }
       
       return res.json({
         message: 'Subscription will be cancelled at the end of your current billing period. You will continue to have access until then.',
@@ -197,6 +228,21 @@ router.post('/cancel-subscription', authenticate, async (req: AuthRequest, res: 
       
       // Update user's plan to free immediately (PayPal webhook will also update when cancellation is confirmed)
       await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, 'CANCELLED', 'free', null);
+
+      // Fetch updated user to broadcast plan update
+      const updatedUser = await getUserByIdFull(userId);
+      if (updatedUser) {
+        broadcastPlanUpdate(userId, {
+          plan: updatedUser.plan || 'free',
+          subscription: updatedUser.paypal ? {
+            subscriptionId: updatedUser.paypal.subscriptionId || null,
+            status: updatedUser.paypal.status || null,
+            nextBillingTime: updatedUser.paypal.nextBillingTime || null,
+            cancelAtPeriodEnd: updatedUser.paypal.cancelAtPeriodEnd || false,
+            cancelScheduledAt: updatedUser.paypal.cancelScheduledAt || null,
+          } : null,
+        });
+      }
 
       return res.json({
         message: 'Subscription cancelled successfully. Your plan has been changed to Free.' + (refundResult ? ' A refund has been processed.' : ''),
@@ -333,11 +379,36 @@ router.post('/webhook', async (req, res: Response) => {
       const previousPlan = user?.plan || 'free';
       const previousPlanName = formatPlanName(previousPlan);
 
+      // Helper function to broadcast plan update after database changes
+      const broadcastPlanUpdateIfNeeded = async () => {
+        if (!user?._id) return;
+        try {
+          const updatedUser = await getUserByPayPalSubscriptionId(subscriptionId);
+          if (updatedUser) {
+            broadcastPlanUpdate(updatedUser._id.toString(), {
+              plan: updatedUser.plan || 'free',
+              subscription: updatedUser.paypal ? {
+                subscriptionId: updatedUser.paypal.subscriptionId || null,
+                status: updatedUser.paypal.status || null,
+                nextBillingTime: updatedUser.paypal.nextBillingTime || null,
+                cancelAtPeriodEnd: updatedUser.paypal.cancelAtPeriodEnd || false,
+                cancelScheduledAt: updatedUser.paypal.cancelScheduledAt || null,
+              } : null,
+            });
+            console.log(`[Webhook ${webhookId}] ✓ Plan update broadcasted to user devices`);
+          }
+        } catch (broadcastError: any) {
+          console.error(`[Webhook ${webhookId}] ✗ Failed to broadcast plan update:`, broadcastError);
+        }
+      };
+
       // Handle specific event types
       if (eventType.includes('BILLING.SUBSCRIPTION.CANCELLED')) {
         console.log(`[Webhook ${webhookId}] Processing CANCELLED event...`);
         await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, 'CANCELLED', targetPlan || 'free', nextBillingTime);
         console.log(`[Webhook ${webhookId}] ✓ Updated subscription to CANCELLED, plan set to ${targetPlan || 'free'}`);
+        // Broadcast plan update
+        await broadcastPlanUpdateIfNeeded();
         // Send email notification
         if (user?.email) {
           try {
@@ -351,6 +422,8 @@ router.post('/webhook', async (req, res: Response) => {
         console.log(`[Webhook ${webhookId}] Processing EXPIRED event...`);
         await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, 'EXPIRED', targetPlan || 'free', nextBillingTime);
         console.log(`[Webhook ${webhookId}] ✓ Updated subscription to EXPIRED, plan set to ${targetPlan || 'free'}`);
+        // Broadcast plan update
+        await broadcastPlanUpdateIfNeeded();
         // Send email notification
         if (user?.email) {
           try {
@@ -364,6 +437,8 @@ router.post('/webhook', async (req, res: Response) => {
         console.log(`[Webhook ${webhookId}] Processing SUSPENDED event...`);
         await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, 'SUSPENDED', targetPlan || 'free', nextBillingTime);
         console.log(`[Webhook ${webhookId}] ✓ Updated subscription to SUSPENDED, plan set to ${targetPlan || 'free'}`);
+        // Broadcast plan update
+        await broadcastPlanUpdateIfNeeded();
         // Send email notification
         if (user?.email) {
           try {
@@ -377,6 +452,8 @@ router.post('/webhook', async (req, res: Response) => {
         console.log(`[Webhook ${webhookId}] Processing PAYMENT DENIED event...`);
         await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, 'FAILED', targetPlan || 'free', nextBillingTime);
         console.log(`[Webhook ${webhookId}] ✓ Payment denied, subscription set to FAILED, plan set to ${targetPlan || 'free'}`);
+        // Broadcast plan update
+        await broadcastPlanUpdateIfNeeded();
         // Send email notification
         if (user?.email) {
           try {
@@ -390,6 +467,8 @@ router.post('/webhook', async (req, res: Response) => {
         console.log(`[Webhook ${webhookId}] Processing ACTIVATED event...`);
         await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, 'ACTIVE', tier, nextBillingTime);
         console.log(`[Webhook ${webhookId}] ✓ Updated subscription to ACTIVE, plan set to ${tier}`);
+        // Broadcast plan update
+        await broadcastPlanUpdateIfNeeded();
         // Send email notification
         if (user?.email) {
           try {
@@ -408,6 +487,8 @@ router.post('/webhook', async (req, res: Response) => {
         await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, status || 'UNKNOWN', updatePlan, nextBillingTime);
         if (updatePlan) {
           console.log(`[Webhook ${webhookId}] ✓ Updated subscription status to ${status}, plan set to ${updatePlan}`);
+          // Broadcast plan update if plan changed
+          await broadcastPlanUpdateIfNeeded();
         } else {
           console.log(`[Webhook ${webhookId}] ✓ Updated subscription status to ${status} (plan unchanged)`);
         }
@@ -421,6 +502,8 @@ router.post('/webhook', async (req, res: Response) => {
         // Billing cycle completed - update next billing time but keep current plan
         await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, status || 'ACTIVE', undefined, nextBillingTime);
         console.log(`[Webhook ${webhookId}] ✓ Billing cycle completed, updated next billing time`);
+        // Broadcast plan update (subscription info may have changed)
+        await broadcastPlanUpdateIfNeeded();
       } else {
         console.log(`[Webhook ${webhookId}] Processing other event (${eventType})...`);
         // For other events, update status but be careful about plan changes
@@ -429,6 +512,8 @@ router.post('/webhook', async (req, res: Response) => {
         await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, status || 'UNKNOWN', updatePlan, nextBillingTime);
         if (updatePlan) {
           console.log(`[Webhook ${webhookId}] ✓ Updated subscription status to ${status}, plan set to ${updatePlan}`);
+          // Broadcast plan update if plan changed
+          await broadcastPlanUpdateIfNeeded();
         } else {
           console.log(`[Webhook ${webhookId}] ✓ Updated subscription status to ${status} (plan unchanged)`);
         }
