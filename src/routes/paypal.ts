@@ -17,6 +17,13 @@ import {
   getUsersWithScheduledCancellations,
   getUserByPayPalSubscriptionId,
 } from '../database.js';
+import {
+  sendSubscriptionCancelledEmail,
+  sendSubscriptionExpiredEmail,
+  sendSubscriptionSuspendedEmail,
+  sendPaymentFailedEmail,
+  sendSubscriptionActivatedEmail,
+} from '../emailService.js';
 
 const router = express.Router();
 
@@ -270,25 +277,148 @@ router.post('/webhook', async (req, res: Response) => {
         }
       }
       
-      // Handle cancellation events
-      if (eventType.includes('BILLING.SUBSCRIPTION.CANCELLED') || eventType.includes('BILLING.SUBSCRIPTION.EXPIRED') || eventType.includes('BILLING.SUBSCRIPTION.SUSPENDED')) {
-        console.log(`[Webhook ${webhookId}] Processing cancellation event...`);
-        await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, status || 'CANCELLED', 'free', nextBillingTime);
-        console.log(`[Webhook ${webhookId}] ✓ Updated subscription to CANCELLED, plan set to free`);
+      // Determine the plan based on subscription status
+      // If subscription is cancelled/expired/failed/suspended, set to free
+      // If active, use the tier from plan_id
+      let targetPlan: 'free' | 'pro' | 'pro_plus' | undefined = undefined;
+      const statusUpper = status.toUpperCase();
+      
+      // Events that should set plan to FREE
+      const shouldSetToFree = 
+        eventType.includes('BILLING.SUBSCRIPTION.CANCELLED') ||
+        eventType.includes('BILLING.SUBSCRIPTION.EXPIRED') ||
+        eventType.includes('BILLING.SUBSCRIPTION.SUSPENDED') ||
+        statusUpper === 'CANCELLED' ||
+        statusUpper === 'EXPIRED' ||
+        statusUpper === 'SUSPENDED' ||
+        statusUpper === 'FAILED' ||
+        eventType.includes('PAYMENT.SALE.DENIED') ||
+        eventType.includes('PAYMENT.CAPTURE.DENIED');
+      
+      // Events that should activate the plan (set to tier)
+      const shouldActivate = 
+        eventType.includes('BILLING.SUBSCRIPTION.ACTIVATED') ||
+        (statusUpper === 'ACTIVE' && tier);
+      
+      if (shouldSetToFree) {
+        targetPlan = 'free';
+        console.log(`[Webhook ${webhookId}] ⚠ Subscription ended (${statusUpper}), setting plan to FREE`);
+      } else if (shouldActivate && tier) {
+        targetPlan = tier;
+        console.log(`[Webhook ${webhookId}] ✓ Subscription activated, setting plan to ${tier.toUpperCase()}`);
+      }
+      
+      // Helper function to format plan name
+      const formatPlanName = (plan: string): string => {
+        if (plan === 'pro_plus') return 'Pro Plus';
+        if (plan === 'pro') return 'Pro';
+        if (plan === 'free') return 'Free';
+        return plan;
+      };
+
+      // Get user's previous plan for email
+      const previousPlan = user?.plan || 'free';
+      const previousPlanName = formatPlanName(previousPlan);
+
+      // Handle specific event types
+      if (eventType.includes('BILLING.SUBSCRIPTION.CANCELLED')) {
+        console.log(`[Webhook ${webhookId}] Processing CANCELLED event...`);
+        await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, 'CANCELLED', targetPlan || 'free', nextBillingTime);
+        console.log(`[Webhook ${webhookId}] ✓ Updated subscription to CANCELLED, plan set to ${targetPlan || 'free'}`);
+        // Send email notification
+        if (user?.email) {
+          try {
+            await sendSubscriptionCancelledEmail(user.email, previousPlanName);
+            console.log(`[Webhook ${webhookId}] ✓ Cancellation email sent to ${user.email}`);
+          } catch (emailError: any) {
+            console.error(`[Webhook ${webhookId}] ✗ Failed to send cancellation email:`, emailError);
+          }
+        }
+      } else if (eventType.includes('BILLING.SUBSCRIPTION.EXPIRED')) {
+        console.log(`[Webhook ${webhookId}] Processing EXPIRED event...`);
+        await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, 'EXPIRED', targetPlan || 'free', nextBillingTime);
+        console.log(`[Webhook ${webhookId}] ✓ Updated subscription to EXPIRED, plan set to ${targetPlan || 'free'}`);
+        // Send email notification
+        if (user?.email) {
+          try {
+            await sendSubscriptionExpiredEmail(user.email, previousPlanName);
+            console.log(`[Webhook ${webhookId}] ✓ Expiration email sent to ${user.email}`);
+          } catch (emailError: any) {
+            console.error(`[Webhook ${webhookId}] ✗ Failed to send expiration email:`, emailError);
+          }
+        }
+      } else if (eventType.includes('BILLING.SUBSCRIPTION.SUSPENDED')) {
+        console.log(`[Webhook ${webhookId}] Processing SUSPENDED event...`);
+        await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, 'SUSPENDED', targetPlan || 'free', nextBillingTime);
+        console.log(`[Webhook ${webhookId}] ✓ Updated subscription to SUSPENDED, plan set to ${targetPlan || 'free'}`);
+        // Send email notification
+        if (user?.email) {
+          try {
+            await sendSubscriptionSuspendedEmail(user.email, previousPlanName);
+            console.log(`[Webhook ${webhookId}] ✓ Suspension email sent to ${user.email}`);
+          } catch (emailError: any) {
+            console.error(`[Webhook ${webhookId}] ✗ Failed to send suspension email:`, emailError);
+          }
+        }
+      } else if (eventType.includes('PAYMENT.SALE.DENIED') || eventType.includes('PAYMENT.CAPTURE.DENIED')) {
+        console.log(`[Webhook ${webhookId}] Processing PAYMENT DENIED event...`);
+        await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, 'FAILED', targetPlan || 'free', nextBillingTime);
+        console.log(`[Webhook ${webhookId}] ✓ Payment denied, subscription set to FAILED, plan set to ${targetPlan || 'free'}`);
+        // Send email notification
+        if (user?.email) {
+          try {
+            await sendPaymentFailedEmail(user.email, previousPlanName);
+            console.log(`[Webhook ${webhookId}] ✓ Payment failed email sent to ${user.email}`);
+          } catch (emailError: any) {
+            console.error(`[Webhook ${webhookId}] ✗ Failed to send payment failed email:`, emailError);
+          }
+        }
       } else if (eventType.includes('BILLING.SUBSCRIPTION.ACTIVATED') && tier) {
-        console.log(`[Webhook ${webhookId}] Processing activation event...`);
-        await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, status || 'ACTIVE', tier, nextBillingTime);
+        console.log(`[Webhook ${webhookId}] Processing ACTIVATED event...`);
+        await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, 'ACTIVE', tier, nextBillingTime);
         console.log(`[Webhook ${webhookId}] ✓ Updated subscription to ACTIVE, plan set to ${tier}`);
+        // Send email notification
+        if (user?.email) {
+          try {
+            const planName = formatPlanName(tier);
+            await sendSubscriptionActivatedEmail(user.email, planName);
+            console.log(`[Webhook ${webhookId}] ✓ Activation email sent to ${user.email}`);
+          } catch (emailError: any) {
+            console.error(`[Webhook ${webhookId}] ✗ Failed to send activation email:`, emailError);
+          }
+        }
       } else if (eventType.includes('BILLING.SUBSCRIPTION.UPDATED')) {
-        console.log(`[Webhook ${webhookId}] Processing update event...`);
-        // Update status and next billing time, but don't change plan unless status changed
-        await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, status || 'UNKNOWN', undefined, nextBillingTime);
-        console.log(`[Webhook ${webhookId}] ✓ Updated subscription status to ${status}`);
+        console.log(`[Webhook ${webhookId}] Processing UPDATED event...`);
+        // Update status and next billing time
+        // Only change plan if status indicates it should be free
+        const updatePlan = shouldSetToFree ? 'free' : (shouldActivate && tier ? tier : undefined);
+        await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, status || 'UNKNOWN', updatePlan, nextBillingTime);
+        if (updatePlan) {
+          console.log(`[Webhook ${webhookId}] ✓ Updated subscription status to ${status}, plan set to ${updatePlan}`);
+        } else {
+          console.log(`[Webhook ${webhookId}] ✓ Updated subscription status to ${status} (plan unchanged)`);
+        }
+      } else if (eventType.includes('BILLING.SUBSCRIPTION.CREATED')) {
+        console.log(`[Webhook ${webhookId}] Processing CREATED event...`);
+        // Subscription created but not yet active - don't change plan yet
+        await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, status || 'CREATED', undefined, nextBillingTime);
+        console.log(`[Webhook ${webhookId}] ✓ Subscription created, status: ${status}`);
+      } else if (eventType.includes('BILLING.SUBSCRIPTION.CYCLE.COMPLETED')) {
+        console.log(`[Webhook ${webhookId}] Processing CYCLE.COMPLETED event...`);
+        // Billing cycle completed - update next billing time but keep current plan
+        await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, status || 'ACTIVE', undefined, nextBillingTime);
+        console.log(`[Webhook ${webhookId}] ✓ Billing cycle completed, updated next billing time`);
       } else {
         console.log(`[Webhook ${webhookId}] Processing other event (${eventType})...`);
-        // Other events - just update status and next billing time
-        await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, status || 'UNKNOWN', undefined, nextBillingTime);
-        console.log(`[Webhook ${webhookId}] ✓ Updated subscription status to ${status}`);
+        // For other events, update status but be careful about plan changes
+        // Only change plan if status clearly indicates it should be free
+        const updatePlan = shouldSetToFree ? 'free' : undefined;
+        await updatePayPalSubscriptionStatusBySubscriptionId(subscriptionId, status || 'UNKNOWN', updatePlan, nextBillingTime);
+        if (updatePlan) {
+          console.log(`[Webhook ${webhookId}] ✓ Updated subscription status to ${status}, plan set to ${updatePlan}`);
+        } else {
+          console.log(`[Webhook ${webhookId}] ✓ Updated subscription status to ${status} (plan unchanged)`);
+        }
       }
     } else {
       console.log(`[Webhook ${webhookId}] ⚠ No subscription ID found in webhook event`);

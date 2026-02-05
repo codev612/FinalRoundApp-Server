@@ -389,11 +389,17 @@ function renderSubscriptionManagement(subscription, plan) {
 // Initialize downgrade modal handlers
 (function initDowngradeModal() {
   const modal = document.getElementById('downgrade-modal');
+  const modalContent = document.getElementById('downgrade-modal-content');
   const confirmBtn = document.getElementById('downgrade-modal-confirm-btn');
   const cancelBtn = document.getElementById('downgrade-modal-cancel-btn');
   
-  if (modal && confirmBtn && cancelBtn) {
-    // Close modal when clicking overlay
+  if (modal && modalContent && confirmBtn && cancelBtn) {
+    // Stop propagation on modal content to prevent closing when clicking inside
+    modalContent.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+    
+    // Close modal when clicking overlay (but not on content)
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
         hideDowngradeModal();
@@ -401,18 +407,20 @@ function renderSubscriptionManagement(subscription, plan) {
     });
     
     // Confirm button
-    confirmBtn.addEventListener('click', () => {
+    confirmBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       performDowngrade();
     });
     
     // Cancel button
-    cancelBtn.addEventListener('click', () => {
+    cancelBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       hideDowngradeModal();
     });
     
     // Close on Escape key
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && modal.style.display === 'flex') {
+      if (e.key === 'Escape' && modal && modal.style.display === 'flex') {
         hideDowngradeModal();
       }
     });
