@@ -82,8 +82,34 @@ function drawDailyTokensChart(points, canvasId) {
 }
 
 async function loadDailyTokens() {
+  return new Promise(async (resolve) => {
   const errEl = $('dailyChartError');
   if (errEl) errEl.style.display = 'none';
+  
+  // Show skeleton for chart
+  const chartContainer = document.getElementById('dailyTokensChart')?.parentElement;
+  const chartUsageContainer = document.getElementById('dailyTokensChartUsage')?.parentElement;
+  
+  if (chartContainer && typeof createSkeletonChart === 'function') {
+    const canvas = $('dailyTokensChart');
+    if (canvas) {
+      canvas.style.display = 'none';
+      const skeleton = createSkeletonChart();
+      skeleton.id = 'skeleton-dailyTokensChart';
+      chartContainer.insertBefore(skeleton, canvas);
+    }
+  }
+  
+  if (chartUsageContainer && typeof createSkeletonChart === 'function') {
+    const canvas = $('dailyTokensChartUsage');
+    if (canvas) {
+      canvas.style.display = 'none';
+      const skeleton = createSkeletonChart();
+      skeleton.id = 'skeleton-dailyTokensChartUsage';
+      chartUsageContainer.insertBefore(skeleton, canvas);
+    }
+  }
+  
   try {
     const hasCustom = !!(chartStart && chartEnd);
     const url = hasCustom
@@ -96,12 +122,42 @@ async function loadDailyTokens() {
     if (!res.ok) throw new Error(data.error || data.message || ('HTTP ' + res.status));
     const days = Array.isArray(data.days) ? data.days : [];
     dailyPoints = days;
+    
+    // Hide skeletons and show charts
+    const skeleton1 = document.getElementById('skeleton-dailyTokensChart');
+    const skeleton2 = document.getElementById('skeleton-dailyTokensChartUsage');
+    const canvas1 = $('dailyTokensChart');
+    const canvas2 = $('dailyTokensChartUsage');
+    
+    if (skeleton1 && canvas1) {
+      skeleton1.remove();
+      canvas1.style.display = 'block';
+    }
+    if (skeleton2 && canvas2) {
+      skeleton2.remove();
+      canvas2.style.display = 'block';
+    }
+    
     drawDailyTokensChart(dailyPoints, 'dailyTokensChart');
     drawDailyTokensChart(dailyPoints, 'dailyTokensChartUsage');
+    resolve();
   } catch (e) {
+    // Remove skeletons on error
+    const skeleton1 = document.getElementById('skeleton-dailyTokensChart');
+    const skeleton2 = document.getElementById('skeleton-dailyTokensChartUsage');
+    const canvas1 = $('dailyTokensChart');
+    const canvas2 = $('dailyTokensChartUsage');
+    
+    if (skeleton1) skeleton1.remove();
+    if (skeleton2) skeleton2.remove();
+    if (canvas1) canvas1.style.display = 'block';
+    if (canvas2) canvas2.style.display = 'block';
+    
     if (errEl) {
       errEl.textContent = String(e.message || e);
       errEl.style.display = 'block';
     }
+    resolve();
   }
+  });
 }

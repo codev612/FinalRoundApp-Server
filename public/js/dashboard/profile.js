@@ -1,7 +1,30 @@
 async function loadProfileMe() {
-  const errEl = $('profileError');
-  const okEl = $('profileSuccess');
-  if (errEl) errEl.style.display = 'none';
+  return new Promise(async (resolve) => {
+    const errEl = $('profileError');
+    const okEl = $('profileSuccess');
+    const loaderEl = $('profileLoader');
+    const profileCard = document.querySelector('#view-profile .card');
+    
+    if (errEl) errEl.style.display = 'none';
+    
+    // Show loader and hide form inputs and captions
+    if (loaderEl) loaderEl.style.display = 'flex';
+    if (profileCard) {
+      const formRows = profileCard.querySelectorAll('.formRow');
+      formRows.forEach(row => {
+        row.style.display = 'none';
+      });
+      // Hide captions (Name, Email, Password labels)
+      const captions = profileCard.querySelectorAll('div[style*="font-weight: 900"]');
+      captions.forEach(caption => {
+        caption.style.display = 'none';
+      });
+      // Hide email change box if visible
+      const emailChangeBox = $('emailChangeBox');
+      if (emailChangeBox && emailChangeBox.style.display !== 'none') {
+        emailChangeBox.style.display = 'none';
+      }
+    }
 
   try {
     const res = await fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } });
@@ -14,8 +37,28 @@ async function loadProfileMe() {
 
     const nameInput = $('profileName');
     const curEmailInput = $('profileEmailCurrent');
-    if (nameInput) nameInput.value = name;
-    if (curEmailInput) curEmailInput.value = email;
+    
+    // Hide loader and show form inputs and captions
+    if (loaderEl) loaderEl.style.display = 'none';
+    if (profileCard) {
+      const formRows = profileCard.querySelectorAll('.formRow');
+      formRows.forEach(row => {
+        row.style.display = 'flex';
+      });
+      // Show captions (Name, Email, Password labels)
+      const captions = profileCard.querySelectorAll('div[style*="font-weight: 900"]');
+      captions.forEach(caption => {
+        caption.style.display = 'block';
+      });
+    }
+    
+    if (nameInput) {
+      nameInput.value = name;
+    }
+    
+    if (curEmailInput) {
+      curEmailInput.value = email;
+    }
 
     // Email change state
     const pendingEmail = data?.emailChange?.pendingEmail ? String(data.emailChange.pendingEmail) : '';
@@ -41,13 +84,30 @@ async function loadProfileMe() {
       if (s1) s1.style.display = isStep1 ? 'flex' : 'none';
       if (s2) s2.style.display = isStep2 ? 'flex' : 'none';
     }
+    resolve();
   } catch (e) {
+    // Hide loader and show form inputs and captions on error
+    if (loaderEl) loaderEl.style.display = 'none';
+    if (profileCard) {
+      const formRows = profileCard.querySelectorAll('.formRow');
+      formRows.forEach(row => {
+        row.style.display = 'flex';
+      });
+      // Show captions (Name, Email, Password labels)
+      const captions = profileCard.querySelectorAll('div[style*="font-weight: 900"]');
+      captions.forEach(caption => {
+        caption.style.display = 'block';
+      });
+    }
+    
     if (okEl) okEl.style.display = 'none';
     if (errEl) {
       errEl.textContent = String(e.message || e);
       errEl.style.display = 'block';
     }
+    resolve();
   }
+  });
 }
 
 (function wireProfile() {

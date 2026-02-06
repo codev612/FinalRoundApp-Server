@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard - FinalRoundApp</title>
+  <!-- Material Design CSS -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/material-components-web@14.0.0/dist/material-components-web.min.css">
   <link rel="stylesheet" href="/styles/dashboard/base.css" />
   <link rel="stylesheet" href="/styles/dashboard/components.css" />
   <script src="/js/dashboard/state.js"></script>
@@ -238,6 +242,12 @@
             <div class="muted">Update your name, email, and password.</div>
             <div class="success" id="profileSuccess"></div>
             <div class="error" id="profileError" style="display:none;"></div>
+            <div class="profileLoader" id="profileLoader" style="display:none;">
+              <div class="profileLoaderSpinner">
+                <div class="spinner"></div>
+              </div>
+              <div class="profileLoaderText">Loading profile...</div>
+            </div>
 
             <div style="margin-top: 12px; font-weight: 900;">Name</div>
             <div class="formRow">
@@ -418,6 +428,7 @@
     </div>
   </div>
 
+  <script src="/js/dashboard/skeletons.js" defer></script>
   <script src="/js/dashboard/plans.js" defer></script>
   <script src="/js/dashboard/charts.js" defer></script>
   <script src="/js/dashboard/tables.js" defer></script>

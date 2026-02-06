@@ -76,9 +76,29 @@ function setKpi(prefix, data) {
   }
 }
 
+function formatBillingDate(dateString) {
+  if (!dateString || dateString === '—') return '—';
+  try {
+    const date = new Date(dateString);
+    if (!Number.isFinite(date.getTime())) return dateString;
+    // Format as "Feb 1, 2026"
+    return date.toLocaleDateString(undefined, { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  } catch (_) {
+    return dateString;
+  }
+}
+
 function setPeriodText(data) {
   const start = data.billingPeriod?.start || '—';
   const end = data.billingPeriod?.end || '—';
   const el = $('periodText');
-  if (el) el.textContent = 'Billing period: ' + start + ' → ' + end;
+  if (el) {
+    const formattedStart = formatBillingDate(start);
+    const formattedEnd = formatBillingDate(end);
+    el.textContent = 'Billing period: ' + formattedStart + ' → ' + formattedEnd;
+  }
 }

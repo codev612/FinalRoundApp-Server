@@ -105,19 +105,28 @@ function _buildSessionRow(s, currentId, errEl) {
 }
 
 async function loadAuthSessions(opts) {
-  const append = !!(opts && opts.append);
-  const box = $('sessionsList');
-  const errEl = $('sessionsError');
-  if (errEl) errEl.style.display = 'none';
-  const showMoreBtn = $('sessionsShowMoreBtn');
-  if (!append) {
-    sessionsLoaded = 0;
-    sessionsTotal = null;
-    if (box) box.textContent = 'Loading…';
-  } else {
-    if (showMoreBtn) showMoreBtn.disabled = true;
-  }
-  try {
+  return new Promise(async (resolve) => {
+    const append = !!(opts && opts.append);
+    const box = $('sessionsList');
+    const errEl = $('sessionsError');
+    if (errEl) errEl.style.display = 'none';
+    const showMoreBtn = $('sessionsShowMoreBtn');
+    if (!append) {
+      sessionsLoaded = 0;
+      sessionsTotal = null;
+      if (box) {
+        // Show skeleton
+        if (typeof createSkeletonSessions === 'function') {
+          box.innerHTML = '';
+          box.appendChild(createSkeletonSessions(3));
+        } else {
+          box.textContent = 'Loading…';
+        }
+      }
+    } else {
+      if (showMoreBtn) showMoreBtn.disabled = true;
+    }
+    try {
     const skip = append ? sessionsLoaded : 0;
     const url = '/api/auth/sessions?limit=' + encodeURIComponent(String(sessionsPageSize)) +
       '&skip=' + encodeURIComponent(String(skip));
@@ -149,6 +158,7 @@ async function loadAuthSessions(opts) {
     });
     sessionsLoaded += sessions.length;
     updateSessionsShowMore();
+    resolve();
   } catch (e) {
     if (errEl) {
       errEl.textContent = String(e.message || e);
@@ -156,7 +166,9 @@ async function loadAuthSessions(opts) {
     }
     if (!append && box) box.textContent = '';
     updateSessionsShowMore();
+    resolve();
   } finally {
     if (showMoreBtn) showMoreBtn.disabled = false;
   }
+  });
 }

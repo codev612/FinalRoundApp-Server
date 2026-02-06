@@ -1,9 +1,22 @@
 async function loadMonthlyUsageTable() {
-  const table = $('monthlyUsageTable');
-  const errEl = $('monthlyTableError');
-  if (errEl) errEl.style.display = 'none';
-  if (!table) return;
-  table.innerHTML = '<tr><td>Loading…</td></tr>';
+  return new Promise(async (resolve) => {
+    const table = $('monthlyUsageTable');
+    const errEl = $('monthlyTableError');
+    if (errEl) errEl.style.display = 'none';
+    if (!table) {
+      resolve();
+      return;
+    }
+  
+  // Show skeleton
+  if (typeof createSkeletonTable === 'function') {
+    const skeleton = createSkeletonTable(5, 3);
+    table.innerHTML = '';
+    table.appendChild(skeleton);
+  } else {
+    table.innerHTML = '<tr><td>Loading…</td></tr>';
+  }
+  
   try {
     if (!billingPeriodStartYmd || !maxSelectableDay || !billingInfoLoaded) {
       // Billing info is fetched by load(); this can run before it finishes.
@@ -11,6 +24,7 @@ async function loadMonthlyUsageTable() {
       setTimeout(() => {
         if (currentRoute === 'usage') loadMonthlyUsageTable();
       }, 250);
+      resolve();
       return;
     }
     const url = '/api/billing/ai-daily-tokens-by-model?start=' + encodeURIComponent(billingPeriodStartYmd) +
@@ -61,13 +75,16 @@ async function loadMonthlyUsageTable() {
       totalRows.push(`<tr><th>Total</th><th>${String(m)}</th><th class="num">${String(v)}</th></tr>`);
     }
     tfoot.innerHTML = totalRows.join('');
+    resolve();
   } catch (e) {
     table.innerHTML = '';
     if (errEl) {
       errEl.textContent = String(e.message || e);
       errEl.style.display = 'block';
     }
+    resolve();
   }
+  });
 }
 
 function fmtMoneyCents(cents, currency) {
@@ -118,61 +135,78 @@ function formatStatus(status, transactionType) {
 }
 
 async function loadInvoicesTable() {
-  const table = $('invoicesTable');
-  const errEl = $('invoicesError');
-  if (errEl) errEl.style.display = 'none';
-  if (!table) return;
-  table.innerHTML = '<tr><td>Loading…</td></tr>';
-  try {
-    const res = await fetch('/api/billing/paypal/transactions', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || data.message || ('HTTP ' + res.status));
-
-    const rows = Array.isArray(data.transactions) ? data.transactions : [];
-    table.innerHTML = `
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Description</th>
-              <th>Status</th>
-              <th class="num">Amount</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        `;
-    const tbody = table.querySelector('tbody');
-    if (!rows.length) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="5" style="color:#555; text-align:center; padding:24px;">No payment history yet.</td>`;
-      tbody.appendChild(tr);
+  return new Promise(async (resolve) => {
+    const table = $('invoicesTable');
+    const errEl = $('invoicesError');
+    if (errEl) errEl.style.display = 'none';
+    if (!table) {
+      resolve();
       return;
     }
-    for (const tx of rows) {
-      const date = formatDate(tx.createdAt);
-      const type = String(tx.transactionType || '').toUpperCase();
-      const desc = String(tx.description || 'Payment');
-      const status = formatStatus(tx.status, tx.transactionType);
-      const amount = tx.amount ? fmtMoney(tx.amount.value, tx.amount.currency) : '—';
-      const typeLabel = type === 'REFUND' ? '<span style="color:#dc2626;">Refund</span>' : '<span style="color:#16a34a;">Payment</span>';
+    
+    // Show skeleton
+    if (typeof createSkeletonTable === 'function') {
+      const skeleton = createSkeletonTable(5, 5);
+      table.innerHTML = '';
+      table.appendChild(skeleton);
+    } else {
+      table.innerHTML = '<tr><td>Loading…</td></tr>';
+    }
+    
+    try {
+      const res = await fetch('/api/billing/paypal/transactions', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || data.message || ('HTTP ' + res.status));
 
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-            <td>${date}</td>
-            <td>${typeLabel}</td>
-            <td>${desc}</td>
-            <td>${status}</td>
-            <td class="num">${amount}</td>
+      const rows = Array.isArray(data.transactions) ? data.transactions : [];
+      table.innerHTML = `
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Status</th>
+                <th class="num">Amount</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
           `;
-      tbody.appendChild(tr);
+      const tbody = table.querySelector('tbody');
+      if (!rows.length) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="5" style="color:#555; text-align:center; padding:24px;">No payment history yet.</td>`;
+        tbody.appendChild(tr);
+        resolve();
+        return;
+      }
+      for (const tx of rows) {
+        const date = formatDate(tx.createdAt);
+        const type = String(tx.transactionType || '').toUpperCase();
+        const desc = String(tx.description || 'Payment');
+        const status = formatStatus(tx.status, tx.transactionType);
+        const amount = tx.amount ? fmtMoney(tx.amount.value, tx.amount.currency) : '—';
+        const typeLabel = type === 'REFUND' ? '<span style="color:#dc2626;">Refund</span>' : '<span style="color:#16a34a;">Payment</span>';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+              <td>${date}</td>
+              <td>${typeLabel}</td>
+              <td>${desc}</td>
+              <td>${status}</td>
+              <td class="num">${amount}</td>
+            `;
+        tbody.appendChild(tr);
+      }
+      resolve();
+    } catch (e) {
+      table.innerHTML = '';
+      if (errEl) {
+        errEl.textContent = String(e.message || e);
+        errEl.style.display = 'block';
+      }
+      resolve();
     }
-  } catch (e) {
-    table.innerHTML = '';
-    if (errEl) {
-      errEl.textContent = String(e.message || e);
-      errEl.style.display = 'block';
-    }
-  }
+  });
 }

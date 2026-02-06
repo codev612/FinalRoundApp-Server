@@ -130,6 +130,48 @@ async function load() {
   }
   billingInfoLoaded = false;
 
+  // Show skeletons for KPIs (preserve structure, just show skeleton content)
+  const planValueEl = $('planValue');
+  const minutesValueEl = $('minutesValue');
+  const tokensValueEl = $('tokensValue');
+  const minutesBarEl = $('minutesBar');
+  const tokensBarEl = $('tokensBar');
+  const periodTextEl = $('periodText');
+  
+  if (planValueEl) {
+    planValueEl.innerHTML = '<div class="skeleton skeleton-text" style="width: 60px; height: 18px;"></div>';
+  }
+  if (minutesValueEl) {
+    minutesValueEl.innerHTML = '<div class="skeleton skeleton-text" style="width: 80px; height: 18px;"></div>';
+  }
+  if (tokensValueEl) {
+    tokensValueEl.innerHTML = '<div class="skeleton skeleton-text" style="width: 100px; height: 18px;"></div>';
+  }
+  if (minutesBarEl) {
+    minutesBarEl.style.width = '0%';
+  }
+  if (tokensBarEl) {
+    tokensBarEl.style.width = '0%';
+  }
+  if (periodTextEl) {
+    periodTextEl.innerHTML = '<div class="skeleton skeleton-text" style="width: 60%; height: 13px;"></div>';
+  }
+  
+  // Show skeletons for plans
+  const plansOverviewEl = $('plansOverview');
+  if (plansOverviewEl && typeof createSkeletonPlans === 'function') {
+    plansOverviewEl.innerHTML = '';
+    const skeletonPlans = createSkeletonPlans(3);
+    skeletonPlans.forEach(plan => plansOverviewEl.appendChild(plan));
+  }
+  
+  const plansBillingEl = $('plansBilling');
+  if (plansBillingEl && typeof createSkeletonPlans === 'function') {
+    plansBillingEl.innerHTML = '';
+    const skeletonPlans = createSkeletonPlans(3);
+    skeletonPlans.forEach(plan => plansBillingEl.appendChild(plan));
+  }
+
   try {
     const res = await fetch('/api/billing/me', {
       headers: { 'Authorization': 'Bearer ' + token }
@@ -156,6 +198,17 @@ async function load() {
       // ignore
     }
 
+    // Clear skeleton content before setting values
+    const planValueEl = $('planValue');
+    const minutesValueEl = $('minutesValue');
+    const tokensValueEl = $('tokensValue');
+    const periodTextEl = $('periodText');
+    
+    if (planValueEl) planValueEl.innerHTML = '';
+    if (minutesValueEl) minutesValueEl.innerHTML = '';
+    if (tokensValueEl) tokensValueEl.innerHTML = '';
+    if (periodTextEl) periodTextEl.innerHTML = '';
+    
     setPeriodText(data);
     setKpi('', data); // overview ids
     // usage ids have a suffix; map via a small prefix trick
@@ -225,6 +278,17 @@ async function load() {
       loadMonthlyUsageTable();
     }
   } catch (e) {
+    // Clear skeleton content on error
+    const planValueEl = $('planValue');
+    const minutesValueEl = $('minutesValue');
+    const tokensValueEl = $('tokensValue');
+    const periodTextEl = $('periodText');
+    
+    if (planValueEl) planValueEl.innerHTML = '—';
+    if (minutesValueEl) minutesValueEl.innerHTML = '—';
+    if (tokensValueEl) tokensValueEl.innerHTML = '—';
+    if (periodTextEl) periodTextEl.innerHTML = 'Loading…';
+    
     showError(String(e.message || e));
   } finally {
     if (refreshBtn) {
