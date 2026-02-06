@@ -1,3 +1,21 @@
+function formatCompactNumber(num) {
+  if (num === null || num === undefined) return '0';
+  const n = Number(num);
+  if (isNaN(n)) return String(num);
+  if (n === 0) return '0';
+  
+  if (n >= 1000000000) {
+    return (n / 1000000000).toFixed(1).replace(/\.0$/, '') + 'B';
+  }
+  if (n >= 1000000) {
+    return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  }
+  if (n >= 1000) {
+    return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  }
+  return String(n);
+}
+
 function renderPlansInto(containerId, currentPlanKey, subscription = null) {
   const plansEl = $(containerId);
   if (!plansEl) return;
@@ -37,12 +55,14 @@ function renderPlansInto(containerId, currentPlanKey, subscription = null) {
         }
       }
     }
+    const priceText = p.price > 0 ? `$${p.price}/month` : 'Free';
     div.innerHTML = `
           <div class="name">${p.name}${isCurrent ? '<span class="badge">Current</span>' : ''}</div>
+          <div style="font-size: 24px; font-weight: 600; margin: 12px 0; color: #212121;">${priceText}</div>
           <ul>
-            <li>${fmt(p.minutes)} transcription minutes / month</li>
-            <li>${fmt(p.tokens)} AI tokens / month</li>
-            <li>${fmt(p.requests)} AI requests / month</li>
+            <li>${formatCompactNumber(p.minutes)} transcription minutes / month</li>
+            <li>${formatCompactNumber(p.tokens)} AI tokens / month</li>
+            <li>${formatCompactNumber(p.requests)} AI requests / month</li>
             <li>Summary: ${p.summary ? 'enabled' : 'not included'}</li>
           </ul>
           ${actionBtn}

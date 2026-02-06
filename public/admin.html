@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard - FinalRoundApp</title>
+  <!-- Material Design CSS -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/material-components-web@14.0.0/dist/material-components-web.min.css">
+  <link rel="stylesheet" href="/styles/dashboard/base.css" />
+  <link rel="stylesheet" href="/styles/dashboard/components.css" />
+  <style>
+    .main {
+      background: #f5f5f5;
+      overflow-y: auto;
+      height: 100vh;
+    }
+    .mainContent {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .view {
+      display: none;
+    }
+    .view.active {
+      display: block;
+    }
+    .card {
+      background: white;
+      border-radius: 4px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .card h2 {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 16px;
+      color: #212121;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat {
+      background: white;
+      border-radius: 4px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #757575;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: 500;
+      color: #212121;
+    }
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border: 1px solid #d0d0d0;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .table th, .table td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #d0d0d0;
+      border-right: 1px solid #d0d0d0;
+      font-size: 14px;
+    }
+    .table th {
+      background: rgba(0,0,0,0.03);
+      font-weight: 500;
+      color: #212121;
+    }
+    .table th:last-child, .table td:last-child {
+      border-right: none;
+    }
+    .table tr:last-child td {
+      border-bottom: none;
+    }
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #000000;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #333333;
+    }
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .badge-free { background: #e0e0e0; color: #424242; }
+    .badge-pro { background: #e3f2fd; color: #1976d2; }
+    .badge-pro_plus { background: #f3e5f5; color: #7b1fa2; }
+    .badge-admin { background: #ffebee; color: #c62828; }
+    .badge-verified { background: #e8f5e9; color: #2e7d32; }
+    .error {
+      background: #ffebee;
+      color: #c62828;
+      padding: 16px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .loader {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(0,0,0,0.1);
+      border-top-color: #000000;
+      border-radius: 50%;
+      animation: spinner-rotate 0.8s linear infinite;
+    }
+    @keyframes spinner-rotate {
+      to { transform: rotate(360deg); }
+    }
+    .pagination {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .pagination button {
+      padding: 8px 12px;
+      border: 1px solid #d0d0d0;
+      background: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .pagination button:hover:not(:disabled) {
+      background: #f5f5f5;
+    }
+    .pagination button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    select {
+      padding: 8px 12px;
+      border: 1px solid #d0d0d0;
+      border-radius: 4px;
+      font-size: 14px;
+      background: white;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #757575;
+    }
+    .empty-state svg {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="appRoot">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebarBrand">
+        <span class="logoDot"></span>
+        <span>Admin Panel</span>
+        <button class="btn btn-ghost btn-icon sidebarCloseBtn" id="sidebarCloseBtn" title="Close menu" aria-label="Close menu">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6 6 18"></path>
+            <path d="M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <nav class="nav" id="nav">
+        <a href="#dashboard" data-route="dashboard" class="active">
+          <span class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 10.5 12 3l9 7.5"></path>
+                <path d="M5 10v10h14V10Z"></path>
+              </svg>
+            </span>
+            <span class="label">Dashboard</span>
+          </span>
+          <span class="pill">Stats</span>
+        </a>
+        <a href="#users" data-route="users">
+          <span class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+            </span>
+            <span class="label">Users</span>
+          </span>
+        </a>
+        <a href="#sessions" data-route="sessions">
+          <span class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+            </span>
+            <span class="label">Sessions</span>
+          </span>
+        </a>
+        <a href="#api-usage" data-route="api-usage">
+          <span class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 19V5"></path>
+                <path d="M10 19V9"></path>
+                <path d="M16 19V12"></path>
+                <path d="M22 19V7"></path>
+              </svg>
+            </span>
+            <span class="label">API Usage</span>
+          </span>
+        </a>
+        <a href="#settings" data-route="settings">
+          <span class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </span>
+            <span class="label">Settings</span>
+          </span>
+        </a>
+      </nav>
+    </aside>
+    <div class="sidebarBackdrop" id="sidebarBackdrop"></div>
+    <main class="main">
+      <div class="mainContent">
+        <div class="error" id="error"></div>
+        
+        <!-- Dashboard View -->
+        <div id="view-dashboard" class="view active">
+          <div class="card">
+            <h2>System Statistics</h2>
+            <div class="stats" id="stats">
+              <div class="loader">
+                <div class="spinner"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Users View -->
+        <div id="view-users" class="view">
+          <div class="card">
+            <h2>Users</h2>
+            <div class="loader" id="usersLoader" style="display:none;">
+              <div class="spinner"></div>
+            </div>
+            <div class="tableWrap" style="overflow-x: auto;">
+              <table class="table" id="usersTable">
+                <thead>
+                  <tr>
+                    <th>Email</th>
+                    <th>Name</th>
+                    <th>Plan</th>
+                    <th>Verified</th>
+                    <th>Admin</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                  <tr>
+                    <td colspan="7" style="text-align:center; padding:40px;">
+                      <div class="loader">
+                        <div class="spinner"></div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination" id="pagination"></div>
+          </div>
+        </div>
+        
+        <!-- Sessions View -->
+        <div id="view-sessions" class="view">
+          <div class="card">
+            <h2>Sessions</h2>
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <p>Sessions management coming soon</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- API Usage View -->
+        <div id="view-api-usage" class="view">
+          <div class="card">
+            <h2>API Usage Statistics</h2>
+            <div style="margin-bottom: 16px; color: #757575; font-size: 14px;" id="apiUsagePeriod"></div>
+            <div class="loader" id="apiUsageLoader" style="display:none;">
+              <div class="spinner"></div>
+            </div>
+            <div id="apiUsageContent">
+              <div class="loader">
+                <div class="spinner"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Settings View -->
+        <div id="view-settings" class="view">
+          <div class="card">
+            <h2>Admin Settings</h2>
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <p>Settings coming soon</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) window.location.href = '/auth/signin';
+
+    const $ = (id) => document.getElementById(id);
+    const errorEl = $('error');
+    let currentRoute = 'dashboard';
+    let currentPage = 0;
+    const pageSize = 20;
+    let totalUsers = 0;
+
+    // Sidebar toggle functionality
+    const sidebar = $('sidebar');
+    const sidebarBackdrop = $('sidebarBackdrop');
+    const sidebarCloseBtn = $('sidebarCloseBtn');
+    const appRoot = $('appRoot');
+
+    function toggleSidebar() {
+      appRoot.classList.toggle('sidebarOpen');
+    }
+
+    if (sidebarCloseBtn) {
+      sidebarCloseBtn.addEventListener('click', toggleSidebar);
+    }
+    if (sidebarBackdrop) {
+      sidebarBackdrop.addEventListener('click', toggleSidebar);
+    }
+
+    // Mobile menu button (if needed)
+    function openSidebar() {
+      appRoot.classList.add('sidebarOpen');
+    }
+
+    // Routing
+    function setRoute(route) {
+      currentRoute = route;
+      
+      // Update active nav link
+      document.querySelectorAll('.nav a').forEach(link => {
+        link.classList.remove('active');
+        if (link.dataset.route === route) {
+          link.classList.add('active');
+        }
+      });
+      
+      // Show/hide views
+      document.querySelectorAll('.view').forEach(view => {
+        view.classList.remove('active');
+      });
+      const activeView = $(`view-${route}`);
+      if (activeView) {
+        activeView.classList.add('active');
+      }
+      
+      // Load data for the route
+      if (route === 'dashboard') {
+        loadStats();
+      } else if (route === 'users') {
+        loadUsers(0);
+      } else if (route === 'api-usage') {
+        loadApiUsage();
+      }
+      
+      // Close sidebar on mobile after navigation
+      if (window.innerWidth <= 980) {
+        appRoot.classList.remove('sidebarOpen');
+      }
+    }
+
+    // Handle nav clicks
+    document.querySelectorAll('.nav a').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const route = link.dataset.route;
+        if (route) {
+          window.location.hash = route;
+          setRoute(route);
+        }
+      });
+    });
+
+    // Handle hash change
+    window.addEventListener('hashchange', () => {
+      const hash = window.location.hash.slice(1) || 'dashboard';
+      setRoute(hash);
+    });
+
+    // Initialize route from hash
+    const initialHash = window.location.hash.slice(1) || 'dashboard';
+    setRoute(initialHash);
+
+    function showError(msg) {
+      if (errorEl) {
+        errorEl.textContent = msg;
+        errorEl.style.display = 'block';
+      }
+    }
+
+    function hideError() {
+      if (errorEl) errorEl.style.display = 'none';
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/admin/stats', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load stats');
+        
+        const statsEl = $('stats');
+        if (statsEl) {
+          statsEl.innerHTML = `
+            <div class="stat">
+              <div class="stat-label">Total Users</div>
+              <div class="stat-value">${data.users.total}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Verified Users</div>
+              <div class="stat-value">${data.users.verified}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Admin Users</div>
+              <div class="stat-value">${data.users.admin}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Total Sessions</div>
+              <div class="stat-value">${data.sessions.total}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">AI Tokens (This Month)</div>
+              <div class="stat-value">${data.apiUsage.totalTokens.toLocaleString()}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">AI Requests (This Month)</div>
+              <div class="stat-value">${data.apiUsage.totalRequests.toLocaleString()}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Free Plan</div>
+              <div class="stat-value">${data.users.plans.free || 0}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Pro Plan</div>
+              <div class="stat-value">${data.users.plans.pro || 0}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Pro+ Plan</div>
+              <div class="stat-value">${data.users.plans.pro_plus || 0}</div>
+            </div>
+          `;
+        }
+      } catch (e) {
+        showError('Failed to load statistics: ' + (e.message || e));
+      }
+    }
+
+    async function loadUsers(page = 0) {
+      const loader = $('usersLoader');
+      const tbody = $('usersTableBody');
+      
+      if (loader) loader.style.display = 'flex';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px;"><div class="spinner"></div></td></tr>';
+      
+      try {
+        const res = await fetch(`/api/admin/users?limit=${pageSize}&skip=${page * pageSize}`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load users');
+        
+        totalUsers = data.total;
+        currentPage = page;
+        
+        if (tbody) {
+          if (data.users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px;">No users found</td></tr>';
+          } else {
+            tbody.innerHTML = data.users.map(user => {
+              const createdDate = new Date(user.created_at);
+              const plan = user.plan || 'free';
+              return `
+                <tr>
+                  <td>${user.email}</td>
+                  <td>${user.name}</td>
+                  <td>
+                    <span class="badge badge-${plan}">${plan === 'pro_plus' ? 'Pro+' : plan.charAt(0).toUpperCase() + plan.slice(1)}</span>
+                  </td>
+                  <td>
+                    ${user.email_verified ? '<span class="badge badge-verified">Verified</span>' : '<span style="color:#757575;">Not verified</span>'}
+                  </td>
+                  <td>
+                    ${user.is_admin ? '<span class="badge badge-admin">Admin</span>' : '<span style="color:#757575;">—</span>'}
+                  </td>
+                  <td>${createdDate.toLocaleDateString()}</td>
+                  <td>
+                    <select onchange="updateUserPlan('${user.id}', this.value)" style="margin-right:8px;">
+                      <option value="free" ${plan === 'free' ? 'selected' : ''}>Free</option>
+                      <option value="pro" ${plan === 'pro' ? 'selected' : ''}>Pro</option>
+                      <option value="pro_plus" ${plan === 'pro_plus' ? 'selected' : ''}>Pro+</option>
+                    </select>
+                    <button class="btn btn-primary btn-sm" onclick="toggleAdmin('${user.id}', ${!user.is_admin})">
+                      ${user.is_admin ? 'Remove Admin' : 'Make Admin'}
+                    </button>
+                  </td>
+                </tr>
+              `;
+            }).join('');
+          }
+        }
+        
+        updatePagination();
+      } catch (e) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px; color:#c62828;">Error loading users</td></tr>';
+        showError('Failed to load users: ' + (e.message || e));
+      } finally {
+        if (loader) loader.style.display = 'none';
+      }
+    }
+
+    function updatePagination() {
+      const paginationEl = $('pagination');
+      if (!paginationEl) return;
+      
+      const totalPages = Math.ceil(totalUsers / pageSize);
+      paginationEl.innerHTML = `
+        <button onclick="loadUsers(${currentPage - 1})" ${currentPage === 0 ? 'disabled' : ''}>Previous</button>
+        <span>Page ${currentPage + 1} of ${totalPages} (${totalUsers} total)</span>
+        <button onclick="loadUsers(${currentPage + 1})" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Next</button>
+      `;
+    }
+
+    async function updateUserPlan(userId, plan) {
+      try {
+        const res = await fetch(`/api/admin/users/${userId}/plan`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ plan })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to update plan');
+        hideError();
+        loadUsers(currentPage);
+        loadStats();
+      } catch (e) {
+        showError('Failed to update plan: ' + (e.message || e));
+      }
+    }
+
+    async function toggleAdmin(userId, isAdmin) {
+      if (!confirm(`Are you sure you want to ${isAdmin ? 'make' : 'remove'} this user an admin?`)) {
+        return;
+      }
+      
+      try {
+        const res = await fetch(`/api/admin/users/${userId}/admin`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ is_admin: isAdmin })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to update admin status');
+        hideError();
+        loadUsers(currentPage);
+        loadStats();
+      } catch (e) {
+        showError('Failed to update admin status: ' + (e.message || e));
+      }
+    }
+
+    async function loadApiUsage() {
+      const loader = $('apiUsageLoader');
+      const content = $('apiUsageContent');
+      const periodEl = $('apiUsagePeriod');
+      
+      if (loader) loader.style.display = 'flex';
+      if (content) content.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+      
+      try {
+        const res = await fetch('/api/admin/api-usage', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load API usage');
+        
+        const periodStart = new Date(data.period.start);
+        const periodEnd = new Date(data.period.end);
+        if (periodEl) {
+          periodEl.textContent = `Period: ${periodStart.toLocaleDateString()} - ${periodEnd.toLocaleDateString()}`;
+        }
+        
+        if (content) {
+          const openai = data.openai || {};
+          const deepgram = data.deepgram || {};
+          const costs = data.costs || {};
+          const openaiCosts = costs.openai || {};
+          const deepgramCosts = costs.deepgram || {};
+          
+          // Build model breakdown table
+          const modelRows = Object.entries(openai.byModel || {})
+            .sort((a, b) => b[1].tokens - a[1].tokens)
+            .map(([model, stats]) => {
+              const modelCost = openaiCosts.byModel && openaiCosts.byModel[model] ? openaiCosts.byModel[model] : 0;
+              return `
+                <tr>
+                  <td><strong>${model}</strong></td>
+                  <td>${stats.tokens.toLocaleString()}</td>
+                  <td>${stats.requests.toLocaleString()}</td>
+                  <td style="font-weight: 500; color: #1976d2;">$${modelCost.toFixed(4)}</td>
+                </tr>
+              `;
+            }).join('');
+          
+          content.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 32px;">
+              <!-- OpenAI Stats -->
+              <div class="stat" style="border-left: 4px solid #10a37f;">
+                <div class="stat-label">OpenAI</div>
+                <div style="margin-top: 12px;">
+                  <div style="font-size: 32px; font-weight: 600; color: #212121; margin-bottom: 8px;">
+                    ${openai.totalTokens.toLocaleString()}
+                  </div>
+                  <div style="font-size: 14px; color: #757575;">Total Tokens</div>
+                </div>
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0;">
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="color: #757575; font-size: 14px;">Prompt Tokens:</span>
+                    <span style="font-weight: 500;">${openai.promptTokens.toLocaleString()}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="color: #757575; font-size: 14px;">Completion Tokens:</span>
+                    <span style="font-weight: 500;">${openai.completionTokens.toLocaleString()}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #757575; font-size: 14px;">Total Requests:</span>
+                    <span style="font-weight: 500;">${openai.totalRequests.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Deepgram Stats -->
+              <div class="stat" style="border-left: 4px solid #8b5cf6;">
+                <div class="stat-label">Deepgram</div>
+                <div style="margin-top: 12px;">
+                  <div style="font-size: 32px; font-weight: 600; color: #212121; margin-bottom: 8px;">
+                    ${deepgram.totalMinutes.toLocaleString()}
+                  </div>
+                  <div style="font-size: 14px; color: #757575;">Total Minutes</div>
+                </div>
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0;">
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="color: #757575; font-size: 14px;">Total Sessions:</span>
+                    <span style="font-weight: 500;">${deepgram.totalSessions.toLocaleString()}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #757575; font-size: 14px;">Total Milliseconds:</span>
+                    <span style="font-weight: 500;">${deepgram.totalMs.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Cost Summary -->
+            <div style="margin-top: 32px; padding: 20px; background: #f5f5f5; border-radius: 4px; border-left: 4px solid #000000;">
+              <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #212121;">Total API Costs</h3>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                <div>
+                  <div style="font-size: 12px; color: #757575; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">OpenAI</div>
+                  <div style="font-size: 24px; font-weight: 600; color: #1976d2;">$${(openaiCosts.total || 0).toFixed(2)}</div>
+                </div>
+                <div>
+                  <div style="font-size: 12px; color: #757575; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Deepgram</div>
+                  <div style="font-size: 24px; font-weight: 600; color: #8b5cf6;">$${(deepgramCosts.total || 0).toFixed(4)}</div>
+                </div>
+                <div>
+                  <div style="font-size: 12px; color: #757575; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Total</div>
+                  <div style="font-size: 28px; font-weight: 700; color: #212121;">$${((openaiCosts.total || 0) + (deepgramCosts.total || 0)).toFixed(2)}</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- OpenAI Model Breakdown -->
+            <div style="margin-top: 24px;">
+              <h3 style="font-size: 16px; font-weight: 500; margin-bottom: 16px; color: #212121;">OpenAI Usage by Model</h3>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Model</th>
+                    <th>Total Tokens</th>
+                    <th>Requests</th>
+                    <th>Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${modelRows || '<tr><td colspan="4" style="text-align:center; padding:20px; color:#757575;">No usage data</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+          `;
+        }
+      } catch (e) {
+        if (content) {
+          content.innerHTML = `
+            <div class="empty-state">
+              <p style="color: #c62828;">Error loading API usage: ${e.message || e}</p>
+            </div>
+          `;
+        }
+        showError('Failed to load API usage: ' + (e.message || e));
+      } finally {
+        if (loader) loader.style.display = 'none';
+      }
+    }
+
+    // Make functions available globally
+    window.updateUserPlan = updateUserPlan;
+    window.toggleAdmin = toggleAdmin;
+    window.loadUsers = loadUsers;
+
+    // Load initial data
+    if (currentRoute === 'dashboard') {
+      loadStats();
+    } else if (currentRoute === 'api-usage') {
+      loadApiUsage();
+    }
+  </script>
+</body>
+</html>

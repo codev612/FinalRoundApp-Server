@@ -8,6 +8,7 @@ import { createServer, IncomingMessage } from 'http';
 import { Socket } from 'net';
 import authRoutes from './routes/auth.js';
 import paypalRoutes from './routes/paypal.js';
+import adminRoutes from './routes/admin.js';
 import { authenticate, verifyToken, AuthRequest, JWTPayload } from './auth.js';
 import { AuthenticatedWebSocket } from './types.js';
 import { registerWebSocketForSession } from './sessionBus.js';
@@ -99,6 +100,7 @@ app.get('/auth/signup', servePublicHtml('auth/signup.html'));
 app.get('/auth/forgot-password', servePublicHtml('auth/forgot-password.html'));
 app.get('/auth/reset-password', servePublicHtml('auth/reset-password.html'));
 app.get('/auth/security-check', servePublicHtml('auth/security-check.html'));
+app.get('/admin', servePublicHtml('admin.html'));
 
 // Health check endpoint
 app.get('/health', (_req: Request, res: Response) => {
@@ -108,6 +110,7 @@ app.get('/health', (_req: Request, res: Response) => {
 // Authentication routes
 app.use('/api/auth', authRoutes);
 app.use('/api/billing/paypal', paypalRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Meeting Session API endpoints (protected)
 app.post('/api/sessions', authenticate, async (req: AuthRequest, res: Response) => {
@@ -458,6 +461,20 @@ app.get('/api/usage/details', authenticate, async (req: AuthRequest, res: Respon
   }
 });
 
+// Get plan configurations (public endpoint for pricing display)
+app.get('/api/plans', (_req: Request, res: Response) => {
+  const plans = Object.values(PLAN_CONFIGS).map(config => ({
+    tier: config.tier,
+    name: config.name,
+    price: config.price,
+    transcriptionMinutesPerMonth: config.transcriptionMinutesPerMonth,
+    aiTokensPerMonth: config.aiTokensPerMonth,
+    aiRequestsPerMonth: config.aiRequestsPerMonth,
+    canUseSummary: config.canUseSummary,
+  }));
+  return res.json({ plans });
+});
+
 // Billing / pricing endpoints (protected)
 app.get('/api/billing/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -465,6 +482,7 @@ app.get('/api/billing/me', authenticate, async (req: AuthRequest, res: Response)
     const user = await getUserByIdFull(userId);
     const plan = normalizePlan(user?.plan);
     const ent = planEntitlements(plan);
+    const planConfig = getPlanConfig(plan);
 
     const { start, end } = getCurrentBillingPeriodUtc();
     const usedMs = await getTranscriptionUsageMsForPeriod(userId, start, end);
@@ -509,6 +527,7 @@ app.get('/api/billing/me', authenticate, async (req: AuthRequest, res: Response)
         email: (user as any)?.email || (req.user?.email || ''),
       },
       plan: ent.plan,
+      planPrice: planConfig.price,
       subscription: user?.paypal ? {
         subscriptionId: user.paypal.subscriptionId,
         status: user.paypal.status,
@@ -807,70 +826,21 @@ const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
-type PlanTier = 'free' | 'pro' | 'pro_plus';
+import { normalizePlan as normalizePlanTier, getPlanConfig, PLAN_CONFIGS, type PlanTier } from './constants/plan-config.js';
 
-const normalizePlan = (p: any): PlanTier => {
-  if (p === 'pro' || p === 'pro_plus') return p;
-  // Backward/alternate naming
-  if (p === 'business' || p === 'proplus' || p === 'pro+') return 'pro_plus';
-  return 'free';
-};
+const normalizePlan = normalizePlanTier;
 
 const planEntitlements = (plan: PlanTier) => {
-  switch (plan) {
-    case 'pro_plus':
-      return {
-        plan,
-        transcriptionMinutesPerMonth: 6000,
-        aiTokensPerMonth: 2_000_000,
-        aiRequestsPerMonth: 20_000,
-        // Per-model token caps (monthly). These sum to aiTokensPerMonth.
-        aiTokensPerMonthByModel: {
-          'gpt-5.2': 600_000,
-          'gpt-5': 500_000,
-          'gpt-5.1': 300_000,
-          'gpt-4.1': 250_000,
-          'gpt-4.1-mini': 200_000,
-          'gpt-4o': 75_000,
-          'gpt-4o-mini': 75_000,
-        },
-        canUseSummary: true,
-        allowedModels: ['gpt-5.2', 'gpt-5', 'gpt-5.1', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'],
-      };
-    case 'pro':
-      return {
-        plan,
-        transcriptionMinutesPerMonth: 1500,
-        aiTokensPerMonth: 500_000,
-        aiRequestsPerMonth: 5_000,
-        // Per-model token caps (monthly). These sum to aiTokensPerMonth.
-        aiTokensPerMonthByModel: {
-          'gpt-5': 200_000,
-          'gpt-5.1': 100_000,
-          'gpt-4.1': 75_000,
-          'gpt-4.1-mini': 75_000,
-          'gpt-4o': 25_000,
-          'gpt-4o-mini': 25_000,
-        },
-        canUseSummary: true,
-        allowedModels: ['gpt-5', 'gpt-5.1', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'],
-      };
-    case 'free':
-    default:
-      return {
-        plan: 'free' as const,
-        transcriptionMinutesPerMonth: 600,
-        aiTokensPerMonth: 50_000,
-        aiRequestsPerMonth: 200,
-        // Per-model token caps (monthly). These sum to aiTokensPerMonth.
-        aiTokensPerMonthByModel: {
-          'gpt-4.1-mini': 40_000,
-          'gpt-4.1': 10_000,
-        },
-        canUseSummary: false,
-        allowedModels: ['gpt-4.1-mini', 'gpt-4.1'],
-      };
-  }
+  const config = getPlanConfig(plan);
+  return {
+    plan: config.tier,
+    transcriptionMinutesPerMonth: config.transcriptionMinutesPerMonth,
+    aiTokensPerMonth: config.aiTokensPerMonth,
+    aiRequestsPerMonth: config.aiRequestsPerMonth,
+    aiTokensPerMonthByModel: config.aiTokensPerMonthByModel,
+    canUseSummary: config.canUseSummary,
+    allowedModels: config.allowedModels,
+  };
 };
 
 const getCurrentBillingPeriodUtc = () => {
@@ -921,6 +891,8 @@ const checkMonthlyAiBudgetsOrThrow = (stats: AiUsageStats, ent: any, model?: str
 
 const preferredModelsForAuto = (plan: PlanTier, requestMode: string): string[] => {
   const mode = requestMode; // 'reply' | 'summary' | 'insights' | 'questions'
+  const config = getPlanConfig(plan);
+  
   if (plan === 'pro_plus') {
     if (mode === 'reply') return ['gpt-5.2', 'gpt-5', 'gpt-5.1', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4o-mini', 'gpt-4o'];
     if (mode === 'summary' || mode === 'insights') return ['gpt-5.2', 'gpt-5', 'gpt-5.1', 'gpt-4.1'];

@@ -21,11 +21,49 @@ const _jwt = _parseJwt(token);
 const userEmail = typeof _jwt?.email === 'string' ? _jwt.email : '';
 const userAvatarText = (userEmail || 'U').trim().slice(0, 1).toUpperCase();
 
-const planOffers = [
-  { key: 'free', name: 'Free', minutes: 600, tokens: 50000, requests: 200, summary: false },
-  { key: 'pro', name: 'Pro', minutes: 1500, tokens: 500000, requests: 5000, summary: true },
-  { key: 'pro_plus', name: 'Pro+', minutes: 6000, tokens: 2000000, requests: 20000, summary: true },
+// Plan offers - loaded from /api/plans endpoint
+// Fallback values (will be replaced when plans are loaded)
+let planOffers = [
+  { key: 'free', name: 'Free', price: 0, minutes: 65, tokens: 50000, requests: 200, summary: false },
+  { key: 'pro', name: 'Pro', price: 20, minutes: 340, tokens: 650000, requests: 3000, summary: true },
+  { key: 'pro_plus', name: 'Pro+', price: 50, minutes: 1690, tokens: 2600000, requests: 15000, summary: true },
 ];
+
+let plansLoaded = false;
+
+// Load plan configurations from API
+async function loadPlanOffers() {
+  try {
+    const res = await fetch('/api/plans');
+    const data = await res.json();
+    if (data.plans && Array.isArray(data.plans)) {
+      planOffers = data.plans.map(p => ({
+        key: p.tier,
+        name: p.name,
+        price: p.price,
+        minutes: p.transcriptionMinutesPerMonth,
+        tokens: p.aiTokensPerMonth,
+        requests: p.aiRequestsPerMonth,
+        summary: p.canUseSummary,
+      }));
+      plansLoaded = true;
+      // Trigger re-render if plans were already rendered
+      if (typeof window.__currentPlanKey !== 'undefined') {
+        const planKey = window.__currentPlanKey;
+        if (typeof renderPlansInto === 'function') {
+          renderPlansInto('plansOverview', planKey);
+          renderPlansInto('plansBilling', planKey, window.__lastSubscriptionData || null);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load plans from API, using fallback values:', e);
+    plansLoaded = true; // Mark as loaded even if failed, to use fallback
+  }
+}
+
+// Load plans immediately
+loadPlanOffers();
 
 let dailyPoints = [];
 let currentRoute = 'overview';

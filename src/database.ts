@@ -23,6 +23,8 @@ export interface User {
   plan?: 'free' | 'pro' | 'pro_plus';
   plan_updated_at?: number;
   password_hash: string;
+  // Admin role
+  is_admin?: boolean;
   email_verified: boolean;
   verification_code: string | null; // 6-digit code
   verification_code_expires: number | null;
@@ -1742,6 +1744,247 @@ export const getUserPaymentTransactions = async (
     ...tx,
     id: tx._id?.toString() || '',
   }));
+};
+
+// Admin functions
+export const getAllUsers = async (limit: number = 100, skip: number = 0): Promise<{ users: User[]; total: number }> => {
+  await connectDB();
+  const collection = getUsersCollection();
+  const total = await collection.countDocuments({});
+  const users = await collection
+    .find({})
+    .sort({ created_at: -1 })
+    .skip(skip)
+    .limit(limit)
+    .toArray();
+  return {
+    users: users.map(u => toUser(u)!).filter(Boolean),
+    total,
+  };
+};
+
+export const updateUserPlan = async (userId: string, plan: 'free' | 'pro' | 'pro_plus'): Promise<boolean> => {
+  await connectDB();
+  const collection = getUsersCollection();
+  const result = await collection.updateOne(
+    { _id: new ObjectId(userId) },
+    { 
+      $set: { 
+        plan,
+        plan_updated_at: Date.now(),
+        updated_at: Date.now(),
+      } 
+    }
+  );
+  return result.modifiedCount > 0;
+};
+
+export const setUserAdmin = async (userId: string, isAdmin: boolean): Promise<boolean> => {
+  await connectDB();
+  const collection = getUsersCollection();
+  const result = await collection.updateOne(
+    { _id: new ObjectId(userId) },
+    { 
+      $set: { 
+        is_admin: isAdmin,
+        updated_at: Date.now(),
+      } 
+    }
+  );
+  return result.modifiedCount > 0;
+};
+
+export const getSystemStats = async () => {
+  await connectDB();
+  const usersCollection = getUsersCollection();
+  const sessionsCollection = getSessionsCollection();
+  
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const apiUsageCollection = getApiUsageCollection(db);
+  
+  const totalUsers = await usersCollection.countDocuments({});
+  const verifiedUsers = await usersCollection.countDocuments({ email_verified: true });
+  const adminUsers = await usersCollection.countDocuments({ is_admin: true });
+  
+  const planCounts = await usersCollection.aggregate([
+    { $group: { _id: '$plan', count: { $sum: 1 } } }
+  ]).toArray();
+  
+  const totalSessions = await sessionsCollection.countDocuments({});
+  
+  const { start, end } = (() => {
+    const now = new Date();
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+    return { start, end };
+  })();
+  
+  const totalApiUsage = await apiUsageCollection.aggregate([
+    {
+      $match: {
+        timestamp: { $gte: start, $lt: end }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        totalTokens: { $sum: '$totalTokens' },
+        totalRequests: { $sum: 1 }
+      }
+    }
+  ]).toArray();
+  
+  return {
+    users: {
+      total: totalUsers,
+      verified: verifiedUsers,
+      admin: adminUsers,
+      plans: planCounts.reduce((acc: any, p: any) => {
+        acc[p._id || 'free'] = p.count;
+        return acc;
+      }, {}),
+    },
+    sessions: {
+      total: totalSessions,
+    },
+    apiUsage: {
+      totalTokens: totalApiUsage[0]?.totalTokens || 0,
+      totalRequests: totalApiUsage[0]?.totalRequests || 0,
+      period: {
+        start: start.toISOString(),
+        end: end.toISOString(),
+      },
+    },
+  };
+};
+
+// Get aggregated API usage stats for admin (OpenAI + Deepgram)
+export const getAdminApiUsageStats = async (startDate?: Date, endDate?: Date) => {
+  await connectDB();
+  
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  
+  const apiUsageCollection = getApiUsageCollection(db);
+  const transcriptionCollection = db.collection<TranscriptionUsage>('transcription_usage');
+  
+  // Default to current month if no dates provided
+  const { start, end } = startDate && endDate
+    ? { start: startDate, end: endDate }
+    : (() => {
+        const now = new Date();
+        const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+        const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+        return { start, end };
+      })();
+  
+  // OpenAI usage aggregation - get totals first
+  const openaiStatsTotal = await apiUsageCollection.aggregate([
+    {
+      $match: {
+        timestamp: { $gte: start, $lt: end }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        totalTokens: { $sum: '$totalTokens' },
+        promptTokens: { $sum: '$promptTokens' },
+        completionTokens: { $sum: '$completionTokens' },
+        totalRequests: { $sum: 1 }
+      }
+    }
+  ]).toArray();
+  
+  // OpenAI usage by model
+  const openaiStatsByModel = await apiUsageCollection.aggregate([
+    {
+      $match: {
+        timestamp: { $gte: start, $lt: end }
+      }
+    },
+    {
+      $group: {
+        _id: '$model',
+        tokens: { $sum: '$totalTokens' },
+        promptTokens: { $sum: '$promptTokens' },
+        completionTokens: { $sum: '$completionTokens' },
+        requests: { $sum: 1 }
+      }
+    }
+  ]).toArray();
+  
+  // Build byModel object
+  const byModel: Record<string, { tokens: number; promptTokens: number; completionTokens: number; requests: number }> = {};
+  for (const item of openaiStatsByModel) {
+    const model = item._id || 'unknown';
+    byModel[model] = {
+      tokens: item.tokens || 0,
+      promptTokens: item.promptTokens || 0,
+      completionTokens: item.completionTokens || 0,
+      requests: item.requests || 0
+    };
+  }
+  
+  const openaiStats = [openaiStatsTotal[0] || {
+    totalTokens: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    totalRequests: 0
+  }];
+  
+  
+  // Deepgram usage aggregation (transcription minutes)
+  const deepgramStats = await transcriptionCollection.aggregate([
+    {
+      $match: {
+        timestamp: { $gte: start, $lt: end }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        totalMs: { $sum: '$durationMs' },
+        totalSessions: { $sum: 1 },
+        totalMinutes: { $sum: { $divide: ['$durationMs', 60000] } }
+      }
+    }
+  ]).toArray();
+  
+  const openaiData = openaiStats[0] || {
+    totalTokens: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    totalRequests: 0
+  };
+  
+  const deepgramData = deepgramStats[0] || {
+    totalMs: 0,
+    totalSessions: 0,
+    totalMinutes: 0
+  };
+  
+  return {
+    period: {
+      start: start.toISOString(),
+      end: end.toISOString(),
+    },
+    openai: {
+      totalTokens: openaiData.totalTokens,
+      promptTokens: openaiData.promptTokens,
+      completionTokens: openaiData.completionTokens,
+      totalRequests: openaiData.totalRequests,
+      byModel,
+    },
+    deepgram: {
+      totalMinutes: Math.round(deepgramData.totalMinutes * 100) / 100,
+      totalMs: deepgramData.totalMs,
+      totalSessions: deepgramData.totalSessions,
+    },
+  };
 };
 
 export default { connectDB, closeDB, getUsersCollection };

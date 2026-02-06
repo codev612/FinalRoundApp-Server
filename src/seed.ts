@@ -1,4 +1,4 @@
-import { connectDB, closeDB, createUser, getUserByEmail, markEmailVerified } from './database.js';
+import { connectDB, closeDB, createUser, getUserByEmail, markEmailVerified, setUserAdmin } from './database.js';
 import { hashPassword } from './auth.js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
@@ -34,7 +34,7 @@ async function seedUser() {
     console.log('Connected to database');
 
     const email = 'mikeyb612@proton.me';
-    const name = 'Mikey';
+    const name = 'Mike Bradley';
     const password = '123456789';
 
     // Check if user already exists
@@ -57,10 +57,21 @@ async function seedUser() {
     await markEmailVerified(user.id);
     console.log('Email marked as verified');
 
+    // Set as admin (optional - set ADMIN=true in environment or pass as argument)
+    const shouldBeAdmin = process.env.ADMIN === 'true' || process.argv.includes('--admin');
+    if (shouldBeAdmin) {
+      await setUserAdmin(user.id, true);
+      console.log('User set as admin');
+    }
+
     console.log('\n✅ Seed user created successfully!');
     console.log(`   Email: ${email}`);
     console.log(`   Password: ${password}`);
-    console.log(`   Email verified: true\n`);
+    console.log(`   Email verified: true`);
+    if (shouldBeAdmin) {
+      console.log(`   Admin: true`);
+    }
+    console.log('');
 
     await closeDB();
     process.exit(0);

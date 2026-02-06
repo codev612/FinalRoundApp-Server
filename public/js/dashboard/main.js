@@ -226,8 +226,13 @@ async function load() {
 
     const planKey = String(data.plan || 'free');
     window.__currentPlanKey = planKey;
-    renderPlansInto('plansOverview', planKey);
-    renderPlansInto('plansBilling', planKey, data.subscription || null);
+    window.__lastSubscriptionData = data.subscription || null;
+    
+    // Render plans - will re-render when API data loads if needed
+    if (typeof renderPlansInto === 'function') {
+      renderPlansInto('plansOverview', planKey);
+      renderPlansInto('plansBilling', planKey, data.subscription || null);
+    }
     if (currentRoute === 'payment' && typeof window.renderPayPalUpgradeUi === 'function') {
       const selectedPlan = paymentPageSelectedPlan() || 'pro';
       window.renderPayPalUpgradeUi(planKey, selectedPlan);
