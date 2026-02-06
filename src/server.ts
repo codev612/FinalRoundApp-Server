@@ -484,7 +484,7 @@ app.get('/api/billing/me', authenticate, async (req: AuthRequest, res: Response)
     const ent = planEntitlements(plan);
     const planConfig = getPlanConfig(plan);
 
-    const { start, end } = getCurrentBillingPeriodUtc();
+    const { start, end } = getBillingPeriodForUser(user);
     const usedMs = await getTranscriptionUsageMsForPeriod(userId, start, end);
     const usedMinutes = Math.floor(usedMs / 60000);
     const limitMinutes = ent.transcriptionMinutesPerMonth;
@@ -565,7 +565,8 @@ app.get('/api/billing/me', authenticate, async (req: AuthRequest, res: Response)
 app.get('/api/billing/ai-daily-tokens', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { start, end } = getCurrentBillingPeriodUtc();
+    const user = await getUserByIdFull(userId);
+    const { start, end } = getBillingPeriodForUser(user);
 
     const parseYmdToUtcDayStart = (s: string): Date | null => {
       const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim());
@@ -685,7 +686,8 @@ app.get('/api/billing/ai-daily-tokens', authenticate, async (req: AuthRequest, r
 app.get('/api/billing/ai-daily-tokens-by-model', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { start, end } = getCurrentBillingPeriodUtc();
+    const user = await getUserByIdFull(userId);
+    const { start, end } = getBillingPeriodForUser(user);
 
     const parseYmdToUtcDayStart = (s: string): Date | null => {
       const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim());
@@ -848,6 +850,64 @@ const getCurrentBillingPeriodUtc = () => {
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
   return { start, end };
+};
+
+/**
+ * Get billing period based on subscription start date (createdAt) or nextBillingTime.
+ * Falls back to calendar month if no subscription data is available.
+ */
+const getBillingPeriodForUser = (user: any): { start: Date; end: Date } => {
+  const now = new Date();
+  
+  // If user has an active subscription, calculate billing period from subscription data
+  if (user?.paypal?.subscriptionId && user?.paypal?.status === 'ACTIVE') {
+    // Prefer nextBillingTime as it's the most accurate (when PayPal will bill next)
+    if (user.paypal.nextBillingTime) {
+      const nextBilling = new Date(user.paypal.nextBillingTime);
+      if (!isNaN(nextBilling.getTime())) {
+        // Current period ends at nextBillingTime, so start is 1 month before
+        const periodEnd = new Date(nextBilling);
+        periodEnd.setUTCHours(0, 0, 0, 0);
+        
+        const periodStart = new Date(periodEnd);
+        periodStart.setUTCMonth(periodStart.getUTCMonth() - 1);
+        
+        // If nextBillingTime is in the future, this is correct
+        // If it's in the past (shouldn't happen for active subscriptions), use calendar month
+        if (periodEnd > now) {
+          return { start: periodStart, end: periodEnd };
+        }
+      }
+    }
+    
+    // Fallback: use createdAt (subscription start) to determine billing cycle day
+    if (user.paypal.createdAt) {
+      const subscriptionStart = new Date(user.paypal.createdAt);
+      if (!isNaN(subscriptionStart.getTime())) {
+        // Calculate current billing period based on subscription start day
+        const startDay = subscriptionStart.getUTCDate();
+        const currentYear = now.getUTCFullYear();
+        const currentMonth = now.getUTCMonth();
+        
+        // Find the start of the current billing period
+        let periodStart = new Date(Date.UTC(currentYear, currentMonth, startDay, 0, 0, 0, 0));
+        
+        // If we haven't reached the start day this month, use last month's start day
+        if (now < periodStart) {
+          periodStart = new Date(Date.UTC(currentYear, currentMonth - 1, startDay, 0, 0, 0, 0));
+        }
+        
+        // Calculate end of billing period (start of next period)
+        const periodEnd = new Date(periodStart);
+        periodEnd.setUTCMonth(periodEnd.getUTCMonth() + 1);
+        
+        return { start: periodStart, end: periodEnd };
+      }
+    }
+  }
+  
+  // Fallback to calendar month for free users or if subscription data is missing
+  return getCurrentBillingPeriodUtc();
 };
 
 type AiUsageStats = Awaited<ReturnType<typeof getUserApiUsageStats>>;
@@ -1133,7 +1193,7 @@ app.post('/ai/respond', authenticate, async (req: AuthRequest, res: Response) =>
     if (modelText.length > 80) {
       return res.status(400).json({ error: 'Model name too long' });
     }
-    const { start: periodStart, end: periodEnd } = getCurrentBillingPeriodUtc();
+    const { start: periodStart, end: periodEnd } = getBillingPeriodForUser(user);
     const monthlyStats = await getUserApiUsageStats(userId, periodStart, periodEnd);
 
     // Auto model selection: choose best allowed model for plan + mode, with cap-aware fallback.
@@ -1747,7 +1807,7 @@ aiWss.on('connection', (ws: WebSocket) => {
         const user = userId ? await getUserByIdFull(userId) : undefined;
         planTier = normalizePlan(user?.plan);
         ent = planEntitlements(planTier);
-        const { start: periodStart, end: periodEnd } = getCurrentBillingPeriodUtc();
+        const { start: periodStart, end: periodEnd } = user ? getBillingPeriodForUser(user) : getCurrentBillingPeriodUtc();
         monthlyStats = await getUserApiUsageStats(userId, periodStart, periodEnd);
 
         if (isAutoModelRequested(model) || model.trim().length === 0) {
@@ -1776,7 +1836,8 @@ aiWss.on('connection', (ws: WebSocket) => {
       // Monthly AI token budget (global + optional per-model)
       try {
         if (!monthlyStats) {
-          const { start: periodStart, end: periodEnd } = getCurrentBillingPeriodUtc();
+          const user = userId ? await getUserByIdFull(userId) : undefined;
+          const { start: periodStart, end: periodEnd } = user ? getBillingPeriodForUser(user) : getCurrentBillingPeriodUtc();
           monthlyStats = await getUserApiUsageStats(userId, periodStart, periodEnd);
         }
         checkMonthlyAiBudgetsOrThrow(monthlyStats, ent as any, model);
