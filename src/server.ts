@@ -42,6 +42,7 @@ import {
   hasUserReadNotification,
   markNotificationAsRead,
   getNotificationsForUser,
+  getActiveDesktopAppVersion,
 } from './database.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -86,11 +87,20 @@ const PORT = Number(process.env.PORT) || 3000;
 // Middleware
 app.use(cors());
 // Increase JSON body limit to support screenshot (base64) payloads.
+// Note: express.json() and express.urlencoded() automatically skip multipart/form-data requests (handled by multer)
 app.use(express.json({ limit: '8mb' }));
+// Increase URL-encoded body limit for file uploads
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
 // Serve static files from public directory
 const publicDir = join(__dirname, '../public');
 app.use(express.static(publicDir));
+
+// Serve uploaded app files
+const uploadsDir = join(__dirname, '../uploads');
+if (fs.existsSync(uploadsDir)) {
+  app.use('/uploads', express.static(uploadsDir));
+}
 
 // Simple website routes (clean URLs)
 const servePublicHtml = (relativePath: string) => (_req: Request, res: Response) => {
@@ -98,6 +108,8 @@ const servePublicHtml = (relativePath: string) => (_req: Request, res: Response)
 };
 
 app.get('/', servePublicHtml('index.html'));
+app.get('/pricing', servePublicHtml('pricing.html'));
+app.get('/download', servePublicHtml('download.html'));
 app.get('/dashboard', servePublicHtml('dashboard.html'));
 app.get('/auth/signin', servePublicHtml('auth/signin.html'));
 app.get('/auth/signup', servePublicHtml('auth/signup.html'));
@@ -184,6 +196,156 @@ app.post('/api/notification/read', authenticate, async (req: AuthRequest, res: R
   } catch (error: any) {
     console.error('Error marking notification as read:', error);
     return res.status(500).json({ error: error.message || 'Failed to mark notification as read' });
+  }
+});
+
+// Download endpoint with custom filename
+app.get('/api/download/:platform', async (req: Request, res: Response) => {
+  try {
+    const platform = req.params.platform as 'windows' | 'macos' | 'linux';
+    if (!['windows', 'macos', 'linux'].includes(platform)) {
+      return res.status(400).json({ error: 'Invalid platform' });
+    }
+
+    const appVersion = await getActiveDesktopAppVersion(platform);
+    if (!appVersion) {
+      return res.status(404).json({ error: 'No active version found for this platform' });
+    }
+
+    const filePath = join(uploadsDir, appVersion.filePath);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Use original file extension from uploaded file (e.g. .zip, .exe, .dmg)
+    const parts = appVersion.fileName.split('.');
+    const originalExt = parts.length > 1 ? parts.pop()?.toLowerCase() : '';
+    const extension = originalExt ? `.${originalExt}` : (
+      platform === 'windows' ? '.exe' : platform === 'macos' ? '.dmg' : '.AppImage'
+    );
+
+    // Generate custom filename: finalroundapp_{version}{extension}
+    const customFileName = `finalroundapp_${appVersion.version}${extension}`;
+
+    // Set Content-Disposition header to force download with custom filename
+    res.setHeader('Content-Disposition', `attachment; filename="${customFileName}"`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+
+    // Stream the file
+    return res.sendFile(filePath);
+  } catch (error: any) {
+    console.error('Error downloading file:', error);
+    return res.status(500).json({ error: error.message || 'Failed to download file' });
+  }
+});
+
+// Public API: Check latest version for desktop app
+app.get('/api/version/check', async (req: Request, res: Response) => {
+  try {
+    const platform = req.query.platform as string;
+    const currentVersion = req.query.currentVersion as string | undefined;
+
+    if (!platform || !['windows', 'macos', 'linux'].includes(platform)) {
+      return res.status(400).json({ error: 'Invalid or missing platform parameter' });
+    }
+
+    const latestVersion = await getActiveDesktopAppVersion(platform as 'windows' | 'macos' | 'linux');
+    
+    if (!latestVersion) {
+      return res.json({
+        platform,
+        hasUpdate: false,
+        latestVersion: null,
+        message: 'No version available for this platform',
+      });
+    }
+
+    // Simple version comparison (semantic versioning)
+    const compareVersions = (v1: string, v2: string): number => {
+      const parts1 = v1.split('.').map(Number);
+      const parts2 = v2.split('.').map(Number);
+      for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+        const part1 = parts1[i] || 0;
+        const part2 = parts2[i] || 0;
+        if (part1 > part2) return 1;
+        if (part1 < part2) return -1;
+      }
+      return 0;
+    };
+
+    const hasUpdate = currentVersion 
+      ? compareVersions(latestVersion.version, currentVersion) > 0
+      : true;
+
+    // Use original file extension from uploaded file
+    const extParts = latestVersion.fileName.split('.');
+    const origExt = extParts.length > 1 ? extParts.pop()?.toLowerCase() : '';
+    const extension = origExt ? `.${origExt}` : (
+      platform === 'windows' ? '.exe' : platform === 'macos' ? '.dmg' : '.AppImage'
+    );
+
+    const downloadUrl = `/api/download/${platform}`;
+    const fileName = `finalroundapp_${latestVersion.version}${extension}`;
+
+    return res.json({
+      platform,
+      hasUpdate,
+      latestVersion: {
+        version: latestVersion.version,
+        downloadUrl,
+        fileName,
+        fileSize: latestVersion.fileSize,
+        releaseNotes: latestVersion.releaseNotes || '',
+        uploadedAt: latestVersion.uploadedAt,
+      },
+      currentVersion: currentVersion || null,
+    });
+  } catch (error: any) {
+    console.error('Error checking version:', error);
+    return res.status(500).json({ error: error.message || 'Failed to check version' });
+  }
+});
+
+// Public API: Get active desktop app download links
+app.get('/api/downloads', async (_req: Request, res: Response) => {
+  try {
+    const windows = await getActiveDesktopAppVersion('windows');
+    const macos = await getActiveDesktopAppVersion('macos');
+    const linux = await getActiveDesktopAppVersion('linux');
+    
+    const downloads: Record<string, any> = {};
+    if (windows) {
+      downloads.windows = {
+        version: windows.version,
+        url: `/api/download/windows`,
+        fileName: windows.fileName,
+        fileSize: windows.fileSize,
+        releaseNotes: windows.releaseNotes,
+      };
+    }
+    if (macos) {
+      downloads.macos = {
+        version: macos.version,
+        url: `/api/download/macos`,
+        fileName: macos.fileName,
+        fileSize: macos.fileSize,
+        releaseNotes: macos.releaseNotes,
+      };
+    }
+    if (linux) {
+      downloads.linux = {
+        version: linux.version,
+        url: `/api/download/linux`,
+        fileName: linux.fileName,
+        fileSize: linux.fileSize,
+        releaseNotes: linux.releaseNotes,
+      };
+    }
+    
+    return res.json({ downloads });
+  } catch (error: any) {
+    console.error('Error fetching download links:', error);
+    return res.status(500).json({ error: error.message || 'Failed to fetch download links' });
   }
 });
 

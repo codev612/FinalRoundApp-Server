@@ -110,6 +110,29 @@
     .btn-primary:hover {
       background: #333333;
     }
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #212121;
+      border: 1px solid #e0e0e0;
+    }
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+    .btn-light {
+      background: #f5f5f5;
+      color: #212121;
+      border: 1px solid #e0e0e0;
+    }
+    .btn-light:hover {
+      background: #eeeeee;
+      border-color: #bdbdbd;
+    }
+    .tableRowMenuBtn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+    }
     .btn-sm {
       padding: 6px 12px;
       font-size: 12px;
@@ -196,7 +219,9 @@
   <div class="app" id="appRoot">
     <aside class="sidebar" id="sidebar">
       <div class="sidebarBrand">
-        <img src="/imgs/logo.png" alt="FinalRoundApp" class="sidebarLogo" />
+        <a href="/" style="display: flex; align-items: center; justify-content: center; width: 100%; text-decoration: none; cursor: pointer;">
+          <img src="/imgs/logo.png" alt="FinalRoundApp" class="sidebarLogo" />
+        </a>
         <button class="btn btn-ghost btn-icon sidebarCloseBtn" id="sidebarCloseBtn" title="Close menu" aria-label="Close menu">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M18 6 6 18"></path>
@@ -265,6 +290,18 @@
               </svg>
             </span>
             <span class="label">Notifications</span>
+          </span>
+        </a>
+        <a href="#desktop-apps" data-route="desktop-apps">
+          <span class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+            </span>
+            <span class="label">Desktop Apps</span>
           </span>
         </a>
         <a href="#settings" data-route="settings">
@@ -392,6 +429,33 @@
           </div>
         </div>
         
+        <!-- Desktop Apps View -->
+        <div id="view-desktop-apps" class="view">
+          <div class="card">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;">
+              <div>
+                <h2 style="margin:0;">Desktop App Versions</h2>
+                <p style="font-size: 13px; color: #757575; margin:4px 0 0 0;">
+                  Upload and manage desktop app versions for Windows, macOS, and Linux.
+                </p>
+              </div>
+              <button id="openUploadModalBtn" class="btn btn-primary" type="button" style="padding:8px 14px; border-radius:999px; font-size:13px;">
+                + Upload App
+              </button>
+            </div>
+            <div style="margin-top: 24px;">
+              <div class="loader" id="desktopAppsLoader" style="display:none;">
+                <div class="spinner"></div>
+              </div>
+              <div id="desktopAppsList">
+                <div class="loader">
+                  <div class="spinner"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
         <!-- Settings View -->
         <div id="view-settings" class="view">
           <div class="card">
@@ -447,6 +511,56 @@
           <button id="saveNotificationBtn" class="btn btn-primary" type="button" style="padding:7px 16px; border-radius:999px; font-size:13px;">Save message</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Desktop App Upload Modal -->
+  <div id="desktopAppUploadModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background:#ffffff; border-radius:14px; padding:18px 18px 16px 18px; max-width:520px; width:90%; box-shadow:0 18px 60px rgba(0,0,0,0.35);">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;">
+        <div>
+          <h3 id="desktopAppModalTitle" style="margin:0; font-size:16px;">Upload Desktop App</h3>
+          <p id="desktopAppModalDescription" style="margin:4px 0 0 0; font-size:13px; color:#757575;">
+            Upload a new version of the desktop app for Windows, macOS, or Linux.
+          </p>
+        </div>
+        <button id="desktopAppUploadModalCloseBtn" type="button" class="btn btn-ghost btn-icon" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <form id="desktopAppUploadForm">
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div>
+            <label for="appPlatform" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Platform *</label>
+            <select id="appPlatform" required style="width:100%; padding:7px 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16); font-size:13px;">
+              <option value="">Select platform</option>
+              <option value="windows">Windows</option>
+              <option value="macos">macOS</option>
+              <option value="linux">Linux</option>
+            </select>
+          </div>
+          <div>
+            <label for="appVersion" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Version *</label>
+            <input id="appVersion" type="text" required style="width:100%; padding:7px 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16); font-size:13px;" placeholder="e.g., 1.0.0" />
+          </div>
+          <div>
+            <label for="appFile" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">App File *</label>
+            <input id="appFile" type="file" required accept=".exe,.dmg,.pkg,.deb,.rpm,.AppImage,.tar.gz,.zip" style="width:100%; padding:7px 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16); font-size:13px;" />
+          </div>
+          <div>
+            <label for="appReleaseNotes" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Release Notes (optional)</label>
+            <textarea id="appReleaseNotes" rows="3" style="width:100%; padding:7px 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16); font-size:13px; resize:vertical;" placeholder="What's new in this version..."></textarea>
+          </div>
+          <div id="desktopAppUploadStatus" style="font-size:12px; color:#4caf50; display:none;"></div>
+          <div style="margin-top:4px; display:flex; gap:8px; justify-content:flex-end;">
+            <button id="desktopAppUploadModalCloseFooterBtn" class="btn btn-secondary" type="button" style="padding:7px 14px; border-radius:999px; font-size:13px;">Close</button>
+            <button id="saveDesktopAppBtn" class="btn btn-primary" type="submit" style="padding:7px 16px; border-radius:999px; font-size:13px;">Upload</button>
+          </div>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -741,6 +855,8 @@
       } else if (route === 'notifications') {
         loadNotificationSettings();
         loadAllNotifications();
+      } else if (route === 'desktop-apps') {
+        loadDesktopApps();
       } else if (route === 'settings') {
         // Settings page is empty for now
       }
@@ -1307,6 +1423,358 @@
       }
     }
 
+    // ----- Desktop Apps Management -----
+    const desktopAppUploadModal = $('desktopAppUploadModal');
+    const openUploadModalBtn = $('openUploadModalBtn');
+    const desktopAppUploadModalCloseBtn = $('desktopAppUploadModalCloseFooterBtn');
+    const desktopAppUploadForm = $('desktopAppUploadForm');
+    
+    let currentReplaceVersionId = null;
+    
+    function openDesktopAppUploadModal(platform = '', versionId = null) {
+      if (desktopAppUploadModal) {
+        desktopAppUploadModal.style.display = 'flex';
+        $('appPlatform').value = platform;
+        $('appVersion').value = '';
+        $('appFile').value = '';
+        $('appReleaseNotes').value = '';
+        $('desktopAppUploadStatus').style.display = 'none';
+        currentReplaceVersionId = versionId;
+        
+        // Update modal title and description based on whether replacing or uploading new
+        const modalTitle = $('desktopAppModalTitle');
+        const modalDesc = $('desktopAppModalDescription');
+        const saveBtn = $('saveDesktopAppBtn');
+        if (modalTitle) {
+          modalTitle.textContent = versionId ? 'Replace Desktop App' : 'Upload Desktop App';
+        }
+        if (modalDesc) {
+          modalDesc.textContent = versionId 
+            ? 'Upload a new file to replace the existing version. The old file will be deleted.'
+            : 'Upload a new version of the desktop app for Windows, macOS, or Linux.';
+        }
+        if (saveBtn) {
+          saveBtn.textContent = versionId ? 'Replace' : 'Upload';
+        }
+      }
+    }
+    
+    function closeDesktopAppUploadModal() {
+      if (desktopAppUploadModal) {
+        desktopAppUploadModal.style.display = 'none';
+        currentReplaceVersionId = null;
+      }
+    }
+    
+    function replaceDesktopAppVersion(versionId, platform) {
+      openDesktopAppUploadModal(platform, versionId);
+    }
+    
+    if (openUploadModalBtn) {
+      openUploadModalBtn.addEventListener('click', openDesktopAppUploadModal);
+    }
+    if ($('desktopAppUploadModalCloseBtn')) {
+      $('desktopAppUploadModalCloseBtn').addEventListener('click', closeDesktopAppUploadModal);
+    }
+    if (desktopAppUploadModalCloseBtn) {
+      desktopAppUploadModalCloseBtn.addEventListener('click', closeDesktopAppUploadModal);
+    }
+    
+    if (desktopAppUploadForm) {
+      desktopAppUploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const platform = $('appPlatform').value;
+        const version = $('appVersion').value;
+        const fileInput = $('appFile');
+        const releaseNotes = $('appReleaseNotes').value;
+        
+        if (!platform || !version || !fileInput.files[0]) {
+          alert('Please fill in all required fields');
+          return;
+        }
+        
+        const formData = new FormData();
+        formData.append('platform', platform);
+        formData.append('version', version);
+        formData.append('file', fileInput.files[0]);
+        if (releaseNotes) {
+          formData.append('releaseNotes', releaseNotes);
+        }
+        
+        const saveBtn = $('saveDesktopAppBtn');
+        const originalText = saveBtn.textContent;
+        saveBtn.disabled = true;
+        saveBtn.textContent = currentReplaceVersionId ? 'Replacing...' : 'Uploading...';
+        
+        try {
+          // If replacing, delete the old version first
+          if (currentReplaceVersionId) {
+            const deleteRes = await fetch(`/api/admin/desktop-apps/${currentReplaceVersionId}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!deleteRes.ok) {
+              const deleteData = await deleteRes.json();
+              throw new Error(deleteData.error || 'Failed to delete old version');
+            }
+          }
+          
+          const res = await fetch('/api/admin/desktop-apps', {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer ' + token
+            },
+            body: formData
+          });
+          
+          const data = await res.json();
+          
+          if (res.ok) {
+            $('desktopAppUploadStatus').textContent = currentReplaceVersionId ? 'App replaced successfully!' : 'App uploaded successfully!';
+            $('desktopAppUploadStatus').style.color = '#4caf50';
+            $('desktopAppUploadStatus').style.display = 'block';
+            currentReplaceVersionId = null;
+            setTimeout(() => {
+              closeDesktopAppUploadModal();
+              loadDesktopApps();
+            }, 1000);
+          } else {
+            $('desktopAppUploadStatus').textContent = data.error || 'Failed to upload app';
+            $('desktopAppUploadStatus').style.color = '#f44336';
+            $('desktopAppUploadStatus').style.display = 'block';
+          }
+        } catch (error) {
+          $('desktopAppUploadStatus').textContent = 'Network error. Please try again.';
+          $('desktopAppUploadStatus').style.color = '#f44336';
+          $('desktopAppUploadStatus').style.display = 'block';
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = originalText;
+        }
+      });
+    }
+    
+    async function loadDesktopApps() {
+      const listEl = $('desktopAppsList');
+      const loaderEl = $('desktopAppsLoader');
+      
+      if (loaderEl) loaderEl.style.display = 'block';
+      if (listEl) listEl.innerHTML = '';
+      
+      try {
+        const res = await fetch('/api/admin/desktop-apps', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+        
+        if (loaderEl) loaderEl.style.display = 'none';
+        
+        if (!res.ok) {
+          if (listEl) listEl.innerHTML = `<div style="color:#f44336; padding:20px; text-align:center;">Error: ${data.error || 'Failed to load desktop apps'}</div>`;
+          return;
+        }
+        
+        const versions = data.versions || [];
+        const grouped = {
+          windows: versions.filter(v => v.platform === 'windows'),
+          macos: versions.filter(v => v.platform === 'macos'),
+          linux: versions.filter(v => v.platform === 'linux')
+        };
+        
+        if (listEl) {
+          listEl.innerHTML = `
+            <div style="display:grid; gap:20px;">
+              ${['windows', 'macos', 'linux'].map(platform => {
+                const platformVersions = grouped[platform] || [];
+                const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
+                return `
+                  <div style="background:#f9f9f9; border-radius:8px; padding:16px;">
+                    <h3 style="margin:0 0 12px 0; font-size:15px; font-weight:600;">${platformName}</h3>
+                    ${platformVersions.length === 0 ? 
+                      '<p style="color:#757575; font-size:13px; margin:0;">No versions uploaded yet.</p>' :
+                      `<table class="table" style="margin:0;">
+                        <thead>
+                          <tr>
+                            <th>Version</th>
+                            <th>File</th>
+                            <th>Size</th>
+                            <th>Uploaded</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${platformVersions.map(v => {
+                            const date = new Date(v.uploadedAt);
+                            const sizeMB = (v.fileSize / (1024 * 1024)).toFixed(2);
+                            return `
+                              <tr>
+                                <td><strong>${v.version}</strong></td>
+                                <td style="font-size:12px; color:#757575;">${v.fileName}</td>
+                                <td style="font-size:12px; color:#757575;">${sizeMB} MB</td>
+                                <td style="font-size:12px; color:#757575;">${date.toLocaleDateString()}</td>
+                                <td>
+                                  ${v.isActive ? 
+                                    '<span style="background:#4caf50; color:white; padding:2px 8px; border-radius:12px; font-size:11px;">Active</span>' :
+                                    '<span style="background:#757575; color:white; padding:2px 8px; border-radius:12px; font-size:11px;">Inactive</span>'
+                                  }
+                                </td>
+                                <td>
+                                  <div class="tableRowMenu">
+                                    <button
+                                      type="button"
+                                      class="btn btn-light btn-sm tableRowMenuBtn"
+                                      onclick="toggleDesktopAppMenu(this)"
+                                      aria-haspopup="menu"
+                                      aria-expanded="false"
+                                      title="Actions"
+                                      style="padding:4px 10px; font-size:12px; border-radius:999px;">
+                                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="1"></circle>
+                                        <circle cx="12" cy="5" r="1"></circle>
+                                        <circle cx="12" cy="19" r="1"></circle>
+                                      </svg>
+                                    </button>
+                                    <div class="menu" style="display:none;" aria-hidden="true">
+                                      ${!v.isActive ? `<button onclick="activateDesktopAppVersion('${v.id || v._id}')" style="width:100%; text-align:left; padding:8px 12px; background:none; border:none; cursor:pointer; font-size:13px; color:#212121; display:block;">Activate</button>` : ''}
+                                      <button onclick="replaceDesktopAppVersion('${v.id || v._id}', '${v.platform}')" style="width:100%; text-align:left; padding:8px 12px; background:none; border:none; cursor:pointer; font-size:13px; color:#212121; display:block;">Replace</button>
+                                      <button onclick="deleteDesktopAppVersion('${v.id || v._id}')" style="width:100%; text-align:left; padding:8px 12px; background:none; border:none; cursor:pointer; font-size:13px; color:#f44336; display:block;">Delete</button>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            `;
+                          }).join('')}
+                        </tbody>
+                      </table>`
+                    }
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+      } catch (error) {
+        if (loaderEl) loaderEl.style.display = 'none';
+        if (listEl) listEl.innerHTML = `<div style="color:#f44336; padding:20px; text-align:center;">Error loading desktop apps: ${error.message}</div>`;
+      }
+    }
+    
+    async function activateDesktopAppVersion(id) {
+      if (!confirm('Set this version as active? Previous active version will be deactivated.')) return;
+      try {
+        const res = await fetch(`/api/admin/desktop-apps/${id}/active`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ isActive: true })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          loadDesktopApps();
+        } else {
+          alert(data.error || 'Failed to activate version');
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+    
+    async function deleteDesktopAppVersion(id) {
+      if (!confirm('Delete this version? This action cannot be undone.')) return;
+      try {
+        const res = await fetch(`/api/admin/desktop-apps/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          loadDesktopApps();
+        } else {
+          alert(data.error || 'Failed to delete version');
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+    
+    function toggleDesktopAppMenu(btn) {
+      const wrapper = btn ? btn.closest('.tableRowMenu') : null;
+      if (!wrapper) return;
+      const isOpen = wrapper.classList.contains('open');
+      
+      // Close all other menus
+      document.querySelectorAll('.tableRowMenu.open').forEach(menu => {
+        if (menu !== wrapper) {
+          menu.classList.remove('open');
+          const otherBtn = menu.querySelector('.tableRowMenuBtn');
+          const otherMenu = menu.querySelector('.menu');
+          if (otherBtn) otherBtn.setAttribute('aria-expanded', 'false');
+          if (otherMenu) otherMenu.setAttribute('aria-hidden', 'true');
+        }
+      });
+      
+      if (!isOpen) {
+        wrapper.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+        const menu = wrapper.querySelector('.menu');
+        if (menu) {
+          menu.setAttribute('aria-hidden', 'false');
+          // Force display block first to measure
+          menu.style.display = 'block';
+          
+          // Dynamic positioning for menu visibility
+          const rect = btn.getBoundingClientRect();
+          const menuRect = menu.getBoundingClientRect();
+          const viewportHeight = window.innerHeight;
+          const viewportWidth = window.innerWidth;
+          
+          menu.style.position = 'fixed';
+          menu.style.zIndex = '1000';
+          
+          // Estimate menu height (if not yet measured, use default)
+          const estimatedMenuHeight = menuRect.height || 120;
+          
+          // Check if menu fits below, otherwise show above
+          const spaceBelow = viewportHeight - rect.bottom;
+          const spaceAbove = rect.top;
+          if (spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow) {
+            menu.style.top = (rect.top - estimatedMenuHeight - 4) + 'px';
+            menu.style.bottom = 'auto';
+          } else {
+            menu.style.top = (rect.bottom + 4) + 'px';
+            menu.style.bottom = 'auto';
+          }
+          
+          // Check horizontal positioning - align to right edge of button
+          const spaceRight = viewportWidth - rect.right;
+          const menuWidth = menuRect.width || 150;
+          if (spaceRight < menuWidth) {
+            menu.style.right = (viewportWidth - rect.right) + 'px';
+            menu.style.left = 'auto';
+          } else {
+            menu.style.left = rect.right + 'px';
+            menu.style.right = 'auto';
+          }
+        }
+      } else {
+        wrapper.classList.remove('open');
+        btn.setAttribute('aria-expanded', 'false');
+        const menu = wrapper.querySelector('.menu');
+        if (menu) {
+          menu.setAttribute('aria-hidden', 'true');
+          menu.style.display = 'none';
+        }
+      }
+    }
+    
+    window.activateDesktopAppVersion = activateDesktopAppVersion;
+    window.deleteDesktopAppVersion = deleteDesktopAppVersion;
+    window.replaceDesktopAppVersion = replaceDesktopAppVersion;
+    window.toggleDesktopAppMenu = toggleDesktopAppMenu;
+
     // Make functions available globally
     window.updateUserPlan = updateUserPlan;
     window.toggleAdmin = toggleAdmin;
@@ -1317,6 +1785,8 @@
       loadStats();
     } else if (currentRoute === 'api-usage') {
       loadApiUsage();
+    } else if (currentRoute === 'desktop-apps') {
+      loadDesktopApps();
     }
   </script>
 </body>

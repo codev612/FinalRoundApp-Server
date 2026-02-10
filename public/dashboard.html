@@ -18,7 +18,9 @@
   <div class="app" id="appRoot">
     <aside class="sidebar" id="sidebar">
       <div class="sidebarBrand">
-        <img src="/imgs/logo.png" alt="FinalRoundApp" class="sidebarLogo" />
+        <a href="/" style="display: flex; align-items: center; justify-content: center; width: 100%; text-decoration: none; cursor: pointer;">
+          <img src="/imgs/logo.png" alt="FinalRoundApp" class="sidebarLogo" />
+        </a>
         <button class="btn btn-ghost btn-icon sidebarCloseBtn" id="sidebarCloseBtn" title="Close menu" aria-label="Close menu">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M18 6 6 18"></path>
@@ -457,6 +459,20 @@
       </div>
     </div>
   </div>
+
+  <!-- Guard: redirect to sign in if user is not authenticated -->
+  <script>
+    (function () {
+      try {
+        var token = window.localStorage ? localStorage.getItem('token') : null;
+        if (!token) {
+          window.location.replace('/auth/signin');
+        }
+      } catch (e) {
+        window.location.replace('/auth/signin');
+      }
+    })();
+  </script>
 
   <script src="/js/dashboard/skeletons.js" defer></script>
   <script src="/js/dashboard/plans.js" defer></script>

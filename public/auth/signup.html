@@ -60,7 +60,7 @@
         }
         label {
             display: block;
-            margin-bottom: 8px;
+            /* margin-bottom: 4px; */
             color: #212121;
             font-weight: 500;
             font-size: 12px;
@@ -134,10 +134,24 @@
         .link a:hover {
             text-decoration: underline;
         }
+        .logo-container {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .logo-container img {
+            height: 72px;
+            width: auto;
+            object-fit: contain;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="logo-container">
+            <a href="/">
+                <img src="/imgs/logo.png" alt="FinalRoundApp" />
+            </a>
+        </div>
         <h1>Create Account</h1>
         <p class="subtitle">Sign up to get started with FinalRoundApp</p>
         
@@ -172,6 +186,19 @@
     </div>
 
     <script>
+        // If already signed in, go straight to dashboard
+        (function () {
+            try {
+                var token = window.localStorage ? localStorage.getItem('token') : null;
+                if (token) {
+                    window.location.replace('/dashboard');
+                    return;
+                }
+            } catch (e) {
+                // ignore and show form
+            }
+        })();
+
         const form = document.getElementById('signupForm');
         const errorDiv = document.getElementById('error');
         const successDiv = document.getElementById('success');

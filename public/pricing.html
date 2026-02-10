@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/imgs/favicon.png">
+  <title>Pricing – FinalRoundApp</title>
+  <meta name="description" content="Compare FinalRoundApp plans – Free, Pro, and Pro+. Choose the right level of AI transcription and tokens for your interviews and meetings.">
+  <link rel="canonical" href="/pricing">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: radial-gradient(circle at top, #111827 0%, #020617 55%, #000 100%);
+      color: #e5e7eb;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .shell {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 20px 16px 40px;
+      width: 100%;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 8px 0 20px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .brand a {
+      text-decoration: none;
+    }
+    .brand-logo {
+      height: 48px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+    }
+    .brand-text {
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-size: 18px;
+      color: #e5e7eb;
+    }
+    nav {
+      display: flex;
+      gap: 12px;
+      font-size: 13px;
+    }
+    nav a {
+      color: #9ca3af;
+      text-decoration: none;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      transition: background .15s ease, color .15s ease, border-color .15s ease;
+    }
+    nav a:hover {
+      color: #e5e7eb;
+      border-color: rgba(148,163,184,0.5);
+      background: rgba(15,23,42,0.7);
+    }
+    nav a.active {
+      color: #e5e7eb;
+      border-color: rgba(59,130,246,0.9);
+      background: rgba(37,99,235,0.16);
+    }
+    .hero {
+      text-align: left;
+      max-width: 640px;
+      padding: 12px 0 28px;
+    }
+    .hero h1 {
+      font-size: 28px;
+      line-height: 1.2;
+      font-weight: 800;
+      color: #f9fafb;
+      margin-bottom: 10px;
+    }
+    .hero p {
+      font-size: 14px;
+      color: #9ca3af;
+      line-height: 1.7;
+    }
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 24px;
+    }
+    @media (max-width: 860px) {
+      .pricing-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .plan-card {
+      background: rgba(15,23,42,0.9);
+      border-radius: 16px;
+      border: 1px solid rgba(31,41,55,0.9);
+      padding: 18px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .plan-name {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      font-size: 14px;
+      color: #f9fafb;
+    }
+    .plan-pill {
+      font-size: 10px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(59,130,246,0.6);
+      color: #bfdbfe;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .plan-price {
+      font-size: 20px;
+      font-weight: 800;
+      color: #f9fafb;
+      margin-top: 4px;
+    }
+    .plan-price span {
+      font-size: 12px;
+      font-weight: 500;
+      color: #9ca3af;
+    }
+    .plan-body {
+      font-size: 13px;
+      color: #9ca3af;
+      line-height: 1.6;
+    }
+    .plan-body ul {
+      margin-top: 8px;
+      padding-left: 18px;
+    }
+    .plan-body li {
+      margin-bottom: 4px;
+    }
+    .plan-cta {
+      margin-top: 10px;
+    }
+    .btn {
+      padding: 9px 14px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background .15s ease, color .15s ease, border-color .15s ease, transform .12s ease;
+    }
+    .btn-primary {
+      background: #111827;
+      color: #f9fafb;
+      border-color: rgba(249,250,251,0.18);
+    }
+    .btn-primary:hover {
+      background: #020617;
+      transform: translateY(-1px);
+    }
+    .btn-ghost {
+      background: transparent;
+      color: #e5e7eb;
+      border-color: rgba(148,163,184,0.4);
+    }
+    .btn-ghost:hover {
+      background: rgba(15,23,42,0.9);
+      transform: translateY(-1px);
+    }
+    footer {
+      margin-top: auto;
+      padding: 16px 0 8px;
+      font-size: 11px;
+      color: #6b7280;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <a href="/">
+          <img src="/imgs/logo.png" alt="FinalRoundApp" class="brand-logo" />
+        </a>
+      </div>
+      <nav>
+        <a href="/" >Home</a>
+        <a href="/pricing" class="active">Pricing</a>
+        <a href="/download">Download</a>
+        <a href="/auth/signin" id="navAuthLink">Sign in</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <h1>Simple, transparent pricing</h1>
+        <p>
+          Start for free, then upgrade when you need more transcription minutes and AI tokens.
+          All plans use the same undetectable, low-latency copilot experience.
+        </p>
+      </section>
+
+      <section class="pricing-grid" aria-label="Pricing plans">
+        <article class="plan-card">
+          <div class="plan-name">
+            Free
+            <span class="plan-pill">Starter</span>
+          </div>
+          <div class="plan-price">
+            $0 <span>/ month</span>
+          </div>
+          <div class="plan-body">
+            <p>Try FinalRoundApp with a limited monthly quota.</p>
+            <ul>
+              <li>Light transcription &amp; AI usage</li>
+              <li>Core interview &amp; meeting copilot</li>
+              <li>Access on any desktop via browser</li>
+            </ul>
+          </div>
+          <div class="plan-cta">
+            <a href="/auth/signup" class="btn btn-ghost">Get started free</a>
+          </div>
+        </article>
+
+        <article class="plan-card">
+          <div class="plan-name">
+            Pro
+            <span class="plan-pill">Most popular</span>
+          </div>
+          <div class="plan-price">
+            $20 <span>/ month</span>
+          </div>
+          <div class="plan-body">
+            <p>For regular interviewers and power users.</p>
+            <ul>
+              <li>More transcription minutes each month</li>
+              <li>Higher AI token limits for Q&amp;A and summaries</li>
+              <li>Priority access to new features</li>
+            </ul>
+          </div>
+          <div class="plan-cta">
+            <a href="/dashboard#billing" class="btn btn-primary">Upgrade to Pro</a>
+          </div>
+        </article>
+
+        <article class="plan-card">
+          <div class="plan-name">
+            Pro+
+            <span class="plan-pill">Teams / Heavy</span>
+          </div>
+          <div class="plan-price">
+            $50 <span>/ month</span>
+          </div>
+          <div class="plan-body">
+            <p>For intensive interview loops, coaching, and teams.</p>
+            <ul>
+              <li>Highest monthly transcription minutes</li>
+              <li>Largest AI token &amp; request quotas</li>
+              <li>Best effective rate on usage</li>
+            </ul>
+          </div>
+          <div class="plan-cta">
+            <a href="/dashboard#billing" class="btn btn-ghost">Talk to sales / upgrade</a>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <footer>
+      &copy; <span id="year"></span> FinalRoundApp. All rights reserved.
+    </footer>
+  </div>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear().toString();
+    (function () {
+      // Toggle nav link between "Sign in" and "Dashboard" based on token
+      try {
+        var link = document.getElementById('navAuthLink');
+        if (!link) return;
+        var token = window.localStorage ? localStorage.getItem('token') : null;
+        if (token) {
+          link.href = '/dashboard';
+          link.textContent = 'Dashboard';
+        } else {
+          link.href = '/auth/signin';
+          link.textContent = 'Sign in';
+        }
+      } catch (e) {
+        // Fallback: leave link as Sign in
+      }
+    })();
+  </script>
+</body>
+</html>
+

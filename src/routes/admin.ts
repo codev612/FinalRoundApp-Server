@@ -14,7 +14,16 @@ import {
   deleteNotification,
   updateNotificationStatus,
   updateNotificationMessage,
+  getAllDesktopAppVersions,
+  createDesktopAppVersion,
+  deleteDesktopAppVersion,
+  setDesktopAppVersionActive,
+  DesktopAppVersion,
 } from '../database.js';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import fs from 'fs';
+import multer from 'multer';
 import {
   OPENAI_PRICING,
   DEEPGRAM_PRICE_PER_MINUTE,
@@ -330,6 +339,150 @@ router.patch('/notifications/:id', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error updating notification message:', error);
     return res.status(500).json({ error: error.message || 'Failed to update notification message' });
+  }
+});
+
+// Desktop App Version Management
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const uploadsDir = join(__dirname, '../../uploads/apps');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + '-' + file.originalname);
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: { 
+    fileSize: 500 * 1024 * 1024, // 500MB limit
+    fieldSize: 10 * 1024 * 1024, // 10MB for other fields
+    fields: 10,
+    files: 1
+  }
+});
+
+// Get all desktop app versions
+router.get('/desktop-apps', async (_req: Request, res: Response) => {
+  try {
+    const versions = await getAllDesktopAppVersions();
+    return res.json({ versions });
+  } catch (error: any) {
+    console.error('Error fetching desktop app versions:', error);
+    return res.status(500).json({ error: error.message || 'Failed to fetch desktop app versions' });
+  }
+});
+
+// Upload new desktop app version
+router.post('/desktop-apps', (req, res, next) => {
+  upload.single('file')(req, res, (err: any) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'File too large. Maximum size is 500MB.' });
+      }
+      return res.status(400).json({ error: err.message || 'File upload error' });
+    }
+    next();
+  });
+}, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    const { platform, version, releaseNotes } = req.body;
+    if (!platform || !version) {
+      // Delete uploaded file if validation fails
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'Platform and version are required' });
+    }
+    
+    if (!['windows', 'macos', 'linux'].includes(platform)) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'Invalid platform. Must be windows, macos, or linux' });
+    }
+    
+    const filePath = `apps/${req.file.filename}`;
+    const versionId = await createDesktopAppVersion(
+      platform as 'windows' | 'macos' | 'linux',
+      version,
+      req.file.originalname,
+      filePath,
+      req.file.size,
+      req.user!.userId,
+      releaseNotes
+    );
+    
+    return res.status(201).json({ 
+      success: true, 
+      id: versionId,
+      message: 'Desktop app version uploaded successfully' 
+    });
+  } catch (error: any) {
+    console.error('Error uploading desktop app version:', error);
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    return res.status(500).json({ error: error.message || 'Failed to upload desktop app version' });
+  }
+});
+
+// Delete desktop app version
+router.delete('/desktop-apps/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const versions = await getAllDesktopAppVersions();
+    const version = versions.find(v => v._id?.toString() === id);
+    
+    if (!version || !version._id) {
+      return res.status(404).json({ error: 'Version not found' });
+    }
+    
+    // Delete file
+    const filePath = join(__dirname, '../../uploads', version.filePath);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    
+    const deleted = await deleteDesktopAppVersion(version._id.toString());
+    if (!deleted) {
+      return res.status(404).json({ error: 'Version not found' });
+    }
+    
+    return res.json({ success: true, message: 'Desktop app version deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting desktop app version:', error);
+    return res.status(500).json({ error: error.message || 'Failed to delete desktop app version' });
+  }
+});
+
+// Set desktop app version as active/inactive
+router.patch('/desktop-apps/:id/active', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+    
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ error: 'isActive must be a boolean' });
+    }
+    
+    const updated = await setDesktopAppVersionActive(id, isActive);
+    if (!updated) {
+      return res.status(404).json({ error: 'Version not found' });
+    }
+    
+    return res.json({ success: true, message: `Version ${isActive ? 'activated' : 'deactivated'} successfully` });
+  } catch (error: any) {
+    console.error('Error updating desktop app version status:', error);
+    return res.status(500).json({ error: error.message || 'Failed to update desktop app version status' });
   }
 });
 

@@ -217,6 +217,19 @@ export interface SystemNotification {
   buttonUrl?: string;
 }
 
+export interface DesktopAppVersion {
+  _id?: ObjectId;
+  platform: 'windows' | 'macos' | 'linux';
+  version: string; // e.g., "1.0.0"
+  fileName: string; // Original filename
+  filePath: string; // Path relative to uploads directory
+  fileSize: number; // Size in bytes
+  isActive: boolean; // Only one active version per platform
+  uploadedBy: string; // User ID of admin who uploaded
+  uploadedAt: Date;
+  releaseNotes?: string;
+}
+
 let client: MongoClient | null = null;
 let db: Db | null = null;
 let usersCollection: Collection<User> | null = null;
@@ -228,6 +241,7 @@ let authSessionsCollection: Collection<AuthSession> | null = null;
 let trustedDevicesCollection: Collection<TrustedDevice> | null = null;
 let loginChallengesCollection: Collection<LoginChallenge> | null = null;
 let paymentTransactionsCollection: Collection<PaymentTransaction> | null = null;
+let desktopAppVersionsCollection: Collection<DesktopAppVersion> | null = null;
 
 // Initialize MongoDB connection
 export const connectDB = async (): Promise<void> => {
@@ -2182,6 +2196,102 @@ export const updateNotificationMessage = async (
     update.buttonUrl = t || undefined;
   }
   const result = await coll.updateOne({ _id: new ObjectId(notificationId) }, { $set: update });
+  return result.modifiedCount > 0;
+};
+
+// Desktop App Version Management
+export const getAllDesktopAppVersions = async (): Promise<DesktopAppVersion[]> => {
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const coll = db.collection<DesktopAppVersion>('desktop_app_versions');
+  const versions = await coll.find({}).sort({ platform: 1, uploadedAt: -1 }).toArray();
+  return versions.map(v => ({
+    ...v,
+    id: v._id?.toString(),
+  }));
+};
+
+export const getActiveDesktopAppVersion = async (platform: 'windows' | 'macos' | 'linux'): Promise<DesktopAppVersion | null> => {
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const coll = db.collection<DesktopAppVersion>('desktop_app_versions');
+  const version = await coll.findOne({ platform, isActive: true });
+  return version;
+};
+
+export const createDesktopAppVersion = async (
+  platform: 'windows' | 'macos' | 'linux',
+  version: string,
+  fileName: string,
+  filePath: string,
+  fileSize: number,
+  uploadedBy: string,
+  releaseNotes?: string
+): Promise<string> => {
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const coll = db.collection<DesktopAppVersion>('desktop_app_versions');
+  
+  // Deactivate all other versions for this platform
+  await coll.updateMany(
+    { platform, isActive: true },
+    { $set: { isActive: false } }
+  );
+  
+  // Create index if not exists
+  try {
+    await coll.createIndex({ platform: 1, isActive: 1 });
+    await coll.createIndex({ uploadedAt: -1 });
+  } catch (_) {}
+  
+  const doc: DesktopAppVersion = {
+    platform,
+    version,
+    fileName,
+    filePath,
+    fileSize,
+    isActive: true,
+    uploadedBy,
+    uploadedAt: new Date(),
+    releaseNotes,
+  };
+  
+  const result = await coll.insertOne(doc);
+  return result.insertedId.toString();
+};
+
+export const deleteDesktopAppVersion = async (versionId: string): Promise<boolean> => {
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const coll = db.collection<DesktopAppVersion>('desktop_app_versions');
+  const result = await coll.deleteOne({ _id: new ObjectId(versionId) });
+  return result.deletedCount > 0;
+};
+
+export const setDesktopAppVersionActive = async (versionId: string, isActive: boolean): Promise<boolean> => {
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const coll = db.collection<DesktopAppVersion>('desktop_app_versions');
+  const version = await coll.findOne({ _id: new ObjectId(versionId) });
+  if (!version) return false;
+  
+  if (isActive) {
+    // Deactivate all other versions for this platform
+    await coll.updateMany(
+      { platform: version.platform, isActive: true, _id: { $ne: new ObjectId(versionId) } },
+      { $set: { isActive: false } }
+    );
+  }
+  
+  const result = await coll.updateOne(
+    { _id: new ObjectId(versionId) },
+    { $set: { isActive } }
+  );
   return result.modifiedCount > 0;
 };
 

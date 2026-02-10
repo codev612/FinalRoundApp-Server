@@ -334,13 +334,41 @@
   display: inline-block;
 }
 .tableRowMenu .menu {
-  min-width: auto;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  min-width: 140px;
   width: max-content;
   max-width: 260px;
+  background: white;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  overflow: hidden;
+  display: none;
   z-index: 1000;
+  padding: 4px 0;
 }
 .tableRowMenu.open .menu {
+  display: block !important;
+}
+.tableRowMenu .menu button {
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: #212121;
   display: block;
+  transition: background 0.15s;
+}
+.tableRowMenu .menu button:hover {
+  background: rgba(0,0,0,0.05);
+}
+.tableRowMenu .menu button[style*="color:#f44336"]:hover {
+  background: rgba(244,67,54,0.1);
 }
 
 .notificationLinkBtn {

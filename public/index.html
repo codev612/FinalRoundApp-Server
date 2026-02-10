@@ -33,106 +33,357 @@
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
     }
     </script>
-    <!-- Material Design CSS -->
+    <!-- Material Design CSS / fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/material-components-web@14.0.0/dist/material-components-web.min.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Oxygen, Ubuntu, Cantarell, sans-serif;
+        background: radial-gradient(circle at top, #0f172a 0%, #020617 55%, #000 100%);
+        color: #e5e7eb;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .shell {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 20px 16px 40px;
+        width: 100%;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 4px 0 18px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+      }
+      .brand a {
+        text-decoration: none;
+      }
+      .brand-logo {
+        height: 48px;
+        width: auto;
+        object-fit: contain;
+        display: block;
+      }
+      .brand-text {
+        font-weight: 800;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        font-size: 18px;
+        color: #e5e7eb;
+      }
+      nav {
+        display: flex;
+        gap: 12px;
+        font-size: 13px;
+      }
+      nav a {
+        color: #9ca3af;
+        text-decoration: none;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        transition: background .15s ease, color .15s ease, border-color .15s ease;
+      }
+      nav a:hover {
+        color: #e5e7eb;
+        border-color: rgba(148,163,184,0.5);
+        background: rgba(15,23,42,0.7);
+      }
+      nav a.active {
+        color: #e5e7eb;
+        border-color: rgba(59,130,246,0.9);
+        background: rgba(37,99,235,0.16);
+      }
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 3fr) minmax(0, 2.4fr);
+        gap: 28px;
+        align-items: flex-start;
+      }
+      @media (max-width: 900px) {
+        main {
+          grid-template-columns: 1fr;
         }
-        body {
-            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            margin: 0;
-        }
-        .container {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.1);
-            padding: 48px;
-            max-width: 500px;
-            width: 100%;
-            text-align: center;
-        }
-        h1 {
-            color: #212121;
-            margin-bottom: 16px;
-            font-size: 2.5em;
-            font-weight: 400;
-        }
-        p {
-            color: #757575;
-            margin-bottom: 32px;
-            line-height: 1.6;
-            font-size: 16px;
-        }
-        .button-group {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        .btn {
-            padding: 14px 28px;
-            border: none;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            transition: all 0.2s;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-        .btn-primary {
-            background: #1976d2;
-            color: white;
-        }
-        .btn-primary:hover {
-            background: #1565c0;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        }
-        .btn-secondary {
-            background: #f5f5f5;
-            color: #212121;
-        }
-        .btn-secondary:hover {
-            background: #e0e0e0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
+      }
+      .hero {
+        padding-top: 8px;
+      }
+      .hero-eyebrow {
+        font-size: 11px;
+        letter-spacing: .16em;
+        text-transform: uppercase;
+        color: #a5b4fc;
+        margin-bottom: 6px;
+        font-weight: 700;
+      }
+      .hero h1 {
+        font-size: 30px;
+        line-height: 1.2;
+        font-weight: 800;
+        color: #f9fafb;
+        margin-bottom: 10px;
+      }
+      .hero-sub {
+        font-size: 14px;
+        color: #9ca3af;
+        line-height: 1.7;
+        max-width: 520px;
+      }
+      .hero-highlights {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .chip {
+        font-size: 11px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        border: 1px solid rgba(156,163,175,0.6);
+        color: #d1d5db;
+        background: rgba(15,23,42,0.7);
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .hero-cta {
+        margin-top: 18px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .button-group {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .btn {
+        padding: 9px 16px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: background .15s ease, color .15s ease, border-color .15s ease, transform .12s ease;
+      }
+      .btn-primary {
+        background: #000000;
+        color: #f9fafb;
+        border-color: rgba(249,250,251,0.22);
+      }
+      .btn-primary:hover {
+        background: #020617;
+        transform: translateY(-1px);
+      }
+      .btn-secondary {
+        background: transparent;
+        color: #e5e7eb;
+        border-color: rgba(148,163,184,0.5);
+      }
+      .btn-secondary:hover {
+        background: rgba(15,23,42,0.9);
+        transform: translateY(-1px);
+      }
+      .hero-meta {
+        margin-top: 10px;
+        font-size: 12px;
+        color: #6b7280;
+      }
+      .hero-meta span {
+        margin-right: 10px;
+      }
+      .features {
+        background: rgba(15,23,42,0.9);
+        border-radius: 18px;
+        border: 1px solid rgba(31,41,55,0.9);
+        padding: 16px 16px 14px;
+      }
+      .features-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #e5e7eb;
+        margin-bottom: 8px;
+      }
+      .features-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      .feature-item {
+        display: flex;
+        gap: 10px;
+      }
+      .feature-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        background: rgba(37,99,235,0.18);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #bfdbfe;
+        flex-shrink: 0;
+        font-size: 14px;
+      }
+      .feature-body {
+        font-size: 13px;
+        color: #9ca3af;
+        line-height: 1.6;
+      }
+      .feature-body strong {
+        color: #e5e7eb;
+        font-weight: 600;
+      }
+      footer {
+        padding: 18px 16px 10px;
+        font-size: 11px;
+        color: #6b7280;
+        text-align: center;
+        margin-top: auto;
+      }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>FinalRoundApp</h1>
-        <p>Your interview & meeting copilot powered by AI</p>
-        <div class="button-group" id="buttons">
-            <a href="/auth/signin" class="btn btn-primary">Sign In</a>
-            <a href="/auth/signup" class="btn btn-secondary">Create Account</a>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <a href="/">
+          <img src="/imgs/logo.png" alt="FinalRoundApp" class="brand-logo" />
+        </a>
+      </div>
+      <nav>
+        <a href="/" class="active">Home</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/download">Download</a>
+        <a href="/auth/signin" id="navAuthLink">Sign in</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-eyebrow">AI meeting copilot</div>
+        <h1>Your intelligent meeting assistant.</h1>
+        <p class="hero-sub">
+          FinalRoundApp sits quietly in the background and turns your meetings into
+          searchable transcripts, smart Q&amp;A, and concise summaries — even during screen share.
+        </p>
+        <div class="hero-highlights">
+          <span class="chip">Hidden during screen share</span>
+          <span class="chip">Real-time transcription &amp; notes</span>
         </div>
-    </div>
-    <script>
-      const buttons = document.getElementById('buttons');
+        <div class="hero-meta">
+          <span>Works on Windows, macOS &amp; Linux</span>
+          <span>Safe for screen share</span>
+        </div>
+      </section>
+
+      <aside class="features" aria-label="Key features">
+        <div class="features-title">Why FinalRoundApp?</div>
+        <div class="features-grid">
+          <div class="feature-item">
+            <div class="feature-icon">
+              <span class="material-icons" style="font-size:16px;">shield</span>
+            </div>
+            <div class="feature-body">
+              <strong>Hidden presence.</strong> Runs in a subtle overlay that stays out of
+              the way — even when you share your screen.
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">
+              <span class="material-icons" style="font-size:16px;">article</span>
+            </div>
+            <div class="feature-body">
+              <strong>Transcribe &amp; summarize in real time.</strong> Capture every word, get a
+              clean summary, and export highlights after each call.
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">
+              <span class="material-icons" style="font-size:16px;">psychology</span>
+            </div>
+            <div class="feature-body">
+              <strong>Smart Q&amp;A.</strong> Ask follow‑up questions, get talking
+              points, and surface key signals without breaking eye contact.
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">
+              <span class="material-icons" style="font-size:16px;">devices</span>
+            </div>
+            <div class="feature-body">
+              <strong>Cross‑platform by design.</strong> Use the same copilot workflow on
+              Windows, macOS, and Linux with nothing to install.
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <footer>
+      &copy; <span id="year"></span> FinalRoundApp. All rights reserved.
+    </footer>
+  </div>
+
+  <script>
+    // Swap primary CTA and nav link when user already has a token
+    (function () {
       const token = localStorage.getItem('token');
-      if (token) {
-        buttons.innerHTML = `
-          <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
-          <button class="btn btn-secondary" id="signOutBtn">Sign Out</button>
-        `;
-        document.getElementById('signOutBtn').addEventListener('click', () => {
-          localStorage.removeItem('token');
-          window.location.reload();
-        });
+      
+      // Update nav link
+      const navLink = document.getElementById('navAuthLink');
+      if (navLink) {
+        if (token) {
+          navLink.href = '/dashboard';
+          navLink.textContent = 'Dashboard';
+        } else {
+          navLink.href = '/auth/signin';
+          navLink.textContent = 'Sign in';
+        }
       }
-    </script>
+      
+      // Update hero CTA buttons
+      const buttons = document.getElementById('buttons');
+      if (buttons && token) {
+        buttons.innerHTML = `
+          <a href="/dashboard" class="btn btn-primary">
+            <span>Go to dashboard</span>
+            <span class="material-icons" style="font-size:16px;">dashboard</span>
+          </a>
+          <button class="btn btn-secondary" id="signOutBtn">
+            <span>Sign out</span>
+          </button>
+        `;
+        const signOutBtn = document.getElementById('signOutBtn');
+        if (signOutBtn) {
+          signOutBtn.addEventListener('click', () => {
+            localStorage.removeItem('token');
+            window.location.reload();
+          });
+        }
+      }
+      
+      const yearEl = document.getElementById('year');
+      if (yearEl) yearEl.textContent = new Date().getFullYear().toString();
+    })();
+  </script>
 </body>
 </html>

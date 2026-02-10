@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/imgs/favicon.png">
+  <title>Download – FinalRoundApp</title>
+  <meta name="description" content="Download FinalRoundApp or open the web dashboard to use the AI-powered interview and meeting copilot on your desktop.">
+  <link rel="canonical" href="/download">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: radial-gradient(circle at top, #0f172a 0%, #020617 55%, #000 100%);
+      color: #e5e7eb;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .shell {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 20px 16px 40px;
+      width: 100%;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 8px 0 20px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .brand a {
+      text-decoration: none;
+    }
+    .brand-logo {
+      height: 48px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+    }
+    .brand-text {
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-size: 18px;
+      color: #e5e7eb;
+    }
+    nav {
+      display: flex;
+      gap: 12px;
+      font-size: 13px;
+    }
+    nav a {
+      color: #9ca3af;
+      text-decoration: none;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      transition: background .15s ease, color .15s ease, border-color .15s ease;
+    }
+    nav a:hover {
+      color: #e5e7eb;
+      border-color: rgba(148,163,184,0.5);
+      background: rgba(15,23,42,0.7);
+    }
+    nav a.active {
+      color: #e5e7eb;
+      border-color: rgba(59,130,246,0.9);
+      background: rgba(37,99,235,0.16);
+    }
+    .hero {
+      padding: 12px 0 24px;
+    }
+    .hero h1 {
+      font-size: 26px;
+      line-height: 1.2;
+      font-weight: 800;
+      color: #f9fafb;
+      margin-bottom: 10px;
+    }
+    .hero p {
+      font-size: 14px;
+      color: #9ca3af;
+      line-height: 1.7;
+      max-width: 560px;
+    }
+    .download-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+    @media (max-width: 900px) {
+      .download-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .download-card {
+      background: rgba(15,23,42,0.9);
+      border-radius: 16px;
+      border: 1px solid rgba(31,41,55,0.9);
+      padding: 18px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .download-card h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #f9fafb;
+      margin-bottom: 6px;
+    }
+    .download-card p {
+      font-size: 13px;
+      color: #9ca3af;
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+    .download-card .btn {
+      margin-top: auto;
+      width: 100%;
+      justify-content: center;
+    }
+    .btn {
+      padding: 9px 14px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background .15s ease, color .15s ease, border-color .15s ease, transform .12s ease;
+    }
+    .btn-primary {
+      background: #111827;
+      color: #f9fafb;
+      border-color: rgba(249,250,251,0.18);
+    }
+    .btn-primary:hover {
+      background: #020617;
+      transform: translateY(-1px);
+    }
+    .btn-ghost {
+      background: transparent;
+      color: #e5e7eb;
+      border-color: rgba(148,163,184,0.4);
+    }
+    .btn-ghost:hover {
+      background: rgba(15,23,42,0.9);
+      transform: translateY(-1px);
+    }
+    ul.features {
+      margin-top: 6px;
+      padding-left: 18px;
+      font-size: 13px;
+      color: #9ca3af;
+      line-height: 1.6;
+    }
+    ul.features li {
+      margin-bottom: 4px;
+    }
+    footer {
+      margin-top: auto;
+      padding: 16px 0 8px;
+      font-size: 11px;
+      color: #6b7280;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <a href="/">
+          <img src="/imgs/logo.png" alt="FinalRoundApp" class="brand-logo" />
+        </a>
+      </div>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/download" class="active">Download</a>
+        <a href="/auth/signin" id="navAuthLink">Sign in</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <h1>Download FinalRoundApp</h1>
+        <p>
+          Download the desktop app for your platform. Available for Windows, macOS, and Linux.
+        </p>
+      </section>
+
+      <section class="download-grid" aria-label="Download options">
+        <article class="download-card">
+          <h2>Windows</h2>
+          <p>
+            Download FinalRoundApp for Windows. Install and run the native desktop app on your PC.
+          </p>
+          <ul class="features">
+            <li>Windows 10 or later</li>
+            <li>Native desktop app</li>
+            <li>Automatic updates</li>
+          </ul>
+          <a href="#" class="btn btn-primary" id="windowsDownloadBtn" onclick="return false;">Download for Windows</a>
+        </article>
+
+        <article class="download-card">
+          <h2>macOS</h2>
+          <p>
+            Download FinalRoundApp for macOS. Install and run the native desktop app on your Mac.
+          </p>
+          <ul class="features">
+            <li>macOS 11 or later</li>
+            <li>Native desktop app</li>
+            <li>Automatic updates</li>
+          </ul>
+          <a href="#" class="btn btn-primary" id="macosDownloadBtn" onclick="return false;">Download for macOS</a>
+        </article>
+
+        <article class="download-card">
+          <h2>Linux</h2>
+          <p>
+            Download FinalRoundApp for Linux. Install and run the native desktop app on your Linux system.
+          </p>
+          <ul class="features">
+            <li>Ubuntu, Debian &amp; more</li>
+            <li>Native desktop app</li>
+            <li>Automatic updates</li>
+          </ul>
+          <a href="#" class="btn btn-primary" id="linuxDownloadBtn" onclick="return false;">Download for Linux</a>
+        </article>
+      </section>
+    </main>
+
+    <footer>
+      &copy; <span id="year"></span> FinalRoundApp. All rights reserved.
+    </footer>
+  </div>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear().toString();
+    (function () {
+      try {
+        var token = window.localStorage ? localStorage.getItem('token') : null;
+        var navLink = document.getElementById('navAuthLink');
+        if (navLink) {
+          if (token) {
+            navLink.href = '/dashboard';
+            navLink.textContent = 'Dashboard';
+          } else {
+            navLink.href = '/auth/signin';
+            navLink.textContent = 'Sign in';
+          }
+        }
+        
+        // Load download links
+        fetch('/api/downloads')
+          .then(res => res.json())
+          .then(data => {
+            const downloads = data.downloads || {};
+            
+            // Windows
+            const windowsBtn = document.getElementById('windowsDownloadBtn');
+            if (windowsBtn) {
+              if (downloads.windows) {
+                windowsBtn.href = downloads.windows.url;
+                windowsBtn.textContent = `Download for Windows (v${downloads.windows.version})`;
+                windowsBtn.onclick = null;
+              } else {
+                windowsBtn.textContent = 'Coming soon';
+                windowsBtn.style.opacity = '0.6';
+                windowsBtn.style.cursor = 'not-allowed';
+              }
+            }
+            
+            // macOS
+            const macosBtn = document.getElementById('macosDownloadBtn');
+            if (macosBtn) {
+              if (downloads.macos) {
+                macosBtn.href = downloads.macos.url;
+                macosBtn.textContent = `Download for macOS (v${downloads.macos.version})`;
+                macosBtn.onclick = null;
+              } else {
+                macosBtn.textContent = 'Coming soon';
+                macosBtn.style.opacity = '0.6';
+                macosBtn.style.cursor = 'not-allowed';
+              }
+            }
+            
+            // Linux
+            const linuxBtn = document.getElementById('linuxDownloadBtn');
+            if (linuxBtn) {
+              if (downloads.linux) {
+                linuxBtn.href = downloads.linux.url;
+                linuxBtn.textContent = `Download for Linux (v${downloads.linux.version})`;
+                linuxBtn.onclick = null;
+              } else {
+                linuxBtn.textContent = 'Coming soon';
+                linuxBtn.style.opacity = '0.6';
+                linuxBtn.style.cursor = 'not-allowed';
+              }
+            }
+          })
+          .catch(err => {
+            console.error('Error loading download links:', err);
+          });
+      } catch (e) {
+        // ignore and keep defaults
+      }
+    })();
+  </script>
+</body>
+</html>
+
