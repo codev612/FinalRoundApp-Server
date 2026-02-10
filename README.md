@@ -1,6 +1,6 @@
-# HearNow Backend
+# FinalRoundApp Backend
 
-Node.js backend server for the HearNow speech-to-text application using Deepgram Nova 3 and WebSocket.
+Node.js backend server for the FinalRoundApp AI meeting assistant application using Deepgram Nova 3 and WebSocket.
 
 ## Prerequisites
 

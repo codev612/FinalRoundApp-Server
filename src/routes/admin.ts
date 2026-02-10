@@ -7,6 +7,13 @@ import {
   setUserAdmin,
   getSystemStats,
   getAdminApiUsageStats,
+  getActiveSystemNotification,
+  setSystemNotification,
+  clearSystemNotification,
+  getAllNotifications,
+  deleteNotification,
+  updateNotificationStatus,
+  updateNotificationMessage,
 } from '../database.js';
 import {
   OPENAI_PRICING,
@@ -174,6 +181,155 @@ router.get('/api-usage', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error fetching API usage stats:', error);
     return res.status(500).json({ error: error.message || 'Failed to fetch API usage stats' });
+  }
+});
+
+// ----- System notification management -----
+
+// Get current active notification (if any)
+router.get('/notification', async (_req: Request, res: Response) => {
+  try {
+    const notif = await getActiveSystemNotification();
+    return res.json({
+      notification: notif
+        ? {
+            id: notif._id?.toString(),
+            message: notif.message,
+            createdAt: notif.createdAt,
+          }
+        : null,
+    });
+  } catch (error: any) {
+    console.error('Error fetching system notification:', error);
+    return res.status(500).json({ error: error.message || 'Failed to fetch notification' });
+  }
+});
+
+// Set or clear the active notification
+router.post('/notification', async (req: Request, res: Response) => {
+  try {
+    const { message, buttonLabel, buttonUrl } = req.body;
+    if (typeof message !== 'string') {
+      return res.status(400).json({ error: 'message must be a string' });
+    }
+
+    const trimmed = message.trim();
+    if (!trimmed) {
+      await clearSystemNotification();
+      return res.json({ success: true, notification: null });
+    }
+
+    const notif = await setSystemNotification(
+      trimmed,
+      typeof buttonLabel === 'string' ? buttonLabel : undefined,
+      typeof buttonUrl === 'string' ? buttonUrl : undefined
+    );
+    return res.json({
+      success: true,
+      notification: {
+        id: notif._id?.toString(),
+        message: notif.message,
+        createdAt: notif.createdAt,
+        buttonLabel: notif.buttonLabel,
+        buttonUrl: notif.buttonUrl,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error setting system notification:', error);
+    return res.status(500).json({ error: error.message || 'Failed to set notification' });
+  }
+});
+
+// Get all notifications (for management page)
+router.get('/notifications', async (req: Request, res: Response) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;
+    const notifications = await getAllNotifications(limit);
+    return res.json({
+      notifications: notifications.map(n => ({
+        id: n._id?.toString(),
+        message: n.message,
+        createdAt: n.createdAt,
+        isActive: n.isActive,
+        buttonLabel: n.buttonLabel,
+        buttonUrl: n.buttonUrl,
+        readCount: Array.isArray(n.readBy) ? n.readBy.length : 0,
+      })),
+    });
+  } catch (error: any) {
+    console.error('Error fetching notifications:', error);
+    return res.status(500).json({ error: error.message || 'Failed to fetch notifications' });
+  }
+});
+
+// Delete a notification
+router.delete('/notifications/:id', async (req: Request, res: Response) => {
+  try {
+    const notificationId = req.params.id;
+    if (!notificationId) {
+      return res.status(400).json({ error: 'Notification ID is required' });
+    }
+    const deleted = await deleteNotification(notificationId);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting notification:', error);
+    return res.status(500).json({ error: error.message || 'Failed to delete notification' });
+  }
+});
+
+// Update notification status (active/inactive)
+router.patch('/notifications/:id/status', async (req: Request, res: Response) => {
+  try {
+    const notificationId = req.params.id;
+    const { isActive } = req.body;
+    if (!notificationId) {
+      return res.status(400).json({ error: 'Notification ID is required' });
+    }
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ error: 'isActive must be a boolean' });
+    }
+    const updated = await updateNotificationStatus(notificationId, isActive);
+    if (!updated) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error updating notification status:', error);
+    return res.status(500).json({ error: error.message || 'Failed to update notification status' });
+  }
+});
+
+// Update notification message text
+router.patch('/notifications/:id', async (req: Request, res: Response) => {
+  try {
+    const notificationId = req.params.id;
+    const { message, buttonLabel, buttonUrl } = req.body;
+    if (!notificationId) {
+      return res.status(400).json({ error: 'Notification ID is required' });
+    }
+    if (typeof message !== 'string') {
+      return res.status(400).json({ error: 'message must be a string' });
+    }
+    const trimmed = message.trim();
+    if (!trimmed) {
+      return res.status(400).json({ error: 'message cannot be empty' });
+    }
+    const updated = await updateNotificationMessage(
+      notificationId,
+      trimmed,
+      typeof buttonLabel === 'string' ? buttonLabel : undefined,
+      typeof buttonUrl === 'string' ? buttonUrl : undefined
+    );
+    if (!updated) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error updating notification message:', error);
+    return res.status(500).json({ error: error.message || 'Failed to update notification message' });
   }
 });
 

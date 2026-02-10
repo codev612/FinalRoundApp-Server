@@ -256,6 +256,17 @@
             <span class="label">API Usage</span>
           </span>
         </a>
+        <a href="#notifications" data-route="notifications">
+          <span class="left">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
+            </span>
+            <span class="label">Notifications</span>
+          </span>
+        </a>
         <a href="#settings" data-route="settings">
           <span class="left">
             <span class="icon" aria-hidden="true">
@@ -353,6 +364,34 @@
           </div>
         </div>
         
+        <!-- Notifications View -->
+        <div id="view-notifications" class="view">
+          <div class="card">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;">
+              <div>
+                <h2 style="margin:0;">Notifications Management</h2>
+                <p style="font-size: 13px; color: #757575; margin:4px 0 0 0;">
+                  Create and manage messages shown to users.
+                </p>
+              </div>
+              <button id="openNotificationModalBtn" class="btn btn-primary" type="button" style="padding:8px 14px; border-radius:999px; font-size:13px;">
+                + Add new
+              </button>
+            </div>
+            <div style="margin-top: 24px;">
+              <h3 style="margin-top: 0; margin-bottom: 16px;">Notification History</h3>
+              <div class="loader" id="notificationsLoader" style="display:none;">
+                <div class="spinner"></div>
+              </div>
+              <div id="notificationsList">
+                <div class="loader">
+                  <div class="spinner"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
         <!-- Settings View -->
         <div id="view-settings" class="view">
           <div class="card">
@@ -368,6 +407,47 @@
         </div>
       </div>
     </main>
+  </div>
+
+  <!-- Notification modal -->
+  <div id="notificationModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background:#ffffff; border-radius:14px; padding:18px 18px 16px 18px; max-width:520px; width:90%; box-shadow:0 18px 60px rgba(0,0,0,0.35);">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;">
+        <div>
+          <h3 style="margin:0; font-size:16px;">New notification</h3>
+          <p style="margin:4px 0 0 0; font-size:13px; color:#757575;">
+            This message will appear in the notification bell for all users.
+          </p>
+        </div>
+        <button id="notificationModalCloseBtn" type="button" class="btn btn-ghost btn-icon" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div>
+        <textarea id="notificationMessage" rows="3" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16); font-size:13px; resize:vertical;" placeholder="Type the message to show to users..."></textarea>
+        <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <div style="flex:1 1 0;">
+              <label for="notificationButtonLabel" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Button title (optional)</label>
+              <input id="notificationButtonLabel" type="text" style="width:100%; padding:7px 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16); font-size:13px;" placeholder="e.g. Open help page" />
+            </div>
+            <div style="flex:1 1 0;">
+              <label for="notificationButtonUrl" style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Button URL (optional)</label>
+              <input id="notificationButtonUrl" type="text" style="width:100%; padding:7px 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16); font-size:13px;" placeholder="https://example.com/help" />
+            </div>
+          </div>
+        </div>
+        <div id="notificationStatus" style="font-size:12px; color:#4caf50; margin-top:6px; display:none;"></div>
+        <div style="margin-top:12px; display:flex; gap:8px; justify-content:flex-end;">
+          <button id="notificationModalCloseFooterBtn" class="btn btn-secondary" type="button" style="padding:7px 14px; border-radius:999px; font-size:13px;">Close</button>
+          <button id="clearNotificationBtn" class="btn btn-light" type="button" style="padding:7px 14px; border-radius:999px; font-size:13px;">Clear</button>
+          <button id="saveNotificationBtn" class="btn btn-primary" type="button" style="padding:7px 16px; border-radius:999px; font-size:13px;">Save message</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -403,6 +483,233 @@
       appRoot.classList.add('sidebarOpen');
     }
 
+    // ----- System notification settings -----
+    async function loadNotificationSettings() {
+      // For the modal, default should always be empty and status hidden.
+      const textarea = $('notificationMessage');
+      const statusEl = $('notificationStatus');
+      const btnLabelEl = $('notificationButtonLabel');
+      const btnUrlEl = $('notificationButtonUrl');
+      if (statusEl) {
+        statusEl.style.display = 'none';
+        statusEl.textContent = '';
+      }
+      if (textarea) {
+        textarea.value = '';
+      }
+      if (btnLabelEl) btnLabelEl.value = '';
+      if (btnUrlEl) btnUrlEl.value = '';
+    }
+
+    let editingNotificationId = null;
+
+    async function saveNotification(message) {
+      const statusEl = $('notificationStatus');
+      if (statusEl) {
+        statusEl.style.display = 'none';
+        statusEl.textContent = '';
+      }
+      const btnLabelEl = $('notificationButtonLabel');
+      const btnUrlEl = $('notificationButtonUrl');
+      const buttonLabel = btnLabelEl ? btnLabelEl.value || '' : '';
+      const buttonUrl = btnUrlEl ? btnUrlEl.value || '' : '';
+      const isEdit = !!editingNotificationId;
+      const url = isEdit ? `/api/admin/notifications/${editingNotificationId}` : '/api/admin/notification';
+      const method = isEdit ? 'PATCH' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token,
+        },
+        body: JSON.stringify({ message, buttonLabel, buttonUrl }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        // Reload notifications list after saving
+        if (currentRoute === 'notifications') {
+          setTimeout(() => loadAllNotifications(), 500);
+        }
+        // Close the modal automatically on success
+        closeNotificationModal();
+        // Optionally flash a success message next time modal opens
+      } else if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.style.color = '#f44336';
+        statusEl.textContent = data.error || 'Failed to save notification.';
+      }
+    }
+
+    // ----- Load all notifications for management -----
+    async function loadAllNotifications() {
+      const listEl = $('notificationsList');
+      const loaderEl = $('notificationsLoader');
+      if (!listEl) return;
+      
+      if (loaderEl) loaderEl.style.display = 'block';
+      // Clear previous content; use only the dedicated loader element
+      listEl.innerHTML = '';
+      
+      try {
+        const res = await fetch('/api/admin/notifications', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json().catch(() => ({}));
+        
+        if (loaderEl) loaderEl.style.display = 'none';
+        
+        if (!res.ok) {
+          listEl.innerHTML = `<div style="color:#f44336; padding:20px; text-align:center;">${data.error || 'Failed to load notifications'}</div>`;
+          return;
+        }
+        
+        const notifications = data.notifications || [];
+        if (notifications.length === 0) {
+          listEl.innerHTML = '<div style="text-align:center; color:#757575; padding:40px;">No notifications yet</div>';
+          return;
+        }
+        
+        listEl.innerHTML = `
+          <div class="tableWrap" style="overflow-x: auto;">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Message</th>
+                  <th>Created</th>
+                  <th>Read Count</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${notifications.map(n => {
+                  const createdAt = n.createdAt ? new Date(n.createdAt).toLocaleString() : 'Unknown';
+                  const messagePreview = n.message && n.message.length > 100 
+                    ? n.message.substring(0, 100) + '...' 
+                    : (n.message || '');
+                  return `
+                    <tr>
+                      <td>
+                        ${n.isActive 
+                          ? '<span style="background:#4caf50; color:white; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:500;">Active</span>' 
+                          : '<span style="background:#757575; color:white; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:500;">Inactive</span>'}
+                      </td>
+                      <td style="max-width:400px; word-wrap:break-word;">${escapeHtml(messagePreview)}</td>
+                      <td style="white-space:nowrap; font-size:13px; color:#757575;">${escapeHtml(createdAt)}</td>
+                      <td style="text-align:center;">${n.readCount || 0}</td>
+                      <td>
+                        <div class="tableRowMenu">
+                          <button
+                            type="button"
+                            class="btn btn-light btn-sm tableRowMenuBtn"
+                            onclick="toggleNotificationRowMenu(this)"
+                            aria-haspopup="menu"
+                            aria-expanded="false"
+                            title="Actions"
+                            style="padding:4px 10px; font-size:12px; border-radius:999px;"
+                          >
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <circle cx="5" cy="12" r="1.5"></circle>
+                              <circle cx="12" cy="12" r="1.5"></circle>
+                              <circle cx="19" cy="12" r="1.5"></circle>
+                            </svg>
+                          </button>
+                          <div class="menu" role="menu" aria-hidden="true">
+                            <button
+                              type="button"
+                              class="menuItem"
+                              data-id="${n.id}"
+                              data-message="${String(n.message || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}"
+                              data-button-label="${String(n.buttonLabel || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}"
+                              data-button-url="${String(n.buttonUrl || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}"
+                              onclick="editNotification(this)"
+                            >
+                              Edit
+                            </button>
+                            ${
+                              n.isActive
+                                ? `<button type="button" class="menuItem" onclick="toggleNotificationStatus('${n.id}', false)">Deactivate</button>`
+                                : `<button type="button" class="menuItem" onclick="toggleNotificationStatus('${n.id}', true)">Activate</button>`
+                            }
+                            <button
+                              type="button"
+                              class="menuItem"
+                              onclick="deleteNotification('${n.id}')"
+                              style="color:#b91c1c;"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } catch (error) {
+        if (loaderEl) loaderEl.style.display = 'none';
+        listEl.innerHTML = `<div style="color:#f44336; padding:20px; text-align:center;">Error loading notifications: ${error.message}</div>`;
+      }
+    }
+
+    async function toggleNotificationStatus(id, isActive) {
+      try {
+        const res = await fetch(`/api/admin/notifications/${id}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ isActive })
+        });
+        const data = await res.json().catch(() => ({}));
+        
+        if (res.ok) {
+          loadAllNotifications();
+        } else {
+          alert(data.error || 'Failed to update notification status');
+        }
+      } catch (error) {
+        alert('Error updating notification status: ' + error.message);
+      }
+    }
+
+    async function deleteNotification(id) {
+      if (!confirm('Are you sure you want to delete this notification?')) {
+        return;
+      }
+      
+      try {
+        const res = await fetch(`/api/admin/notifications/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json().catch(() => ({}));
+        
+        if (res.ok) {
+          loadAllNotifications();
+        } else {
+          alert(data.error || 'Failed to delete notification');
+        }
+      } catch (error) {
+        alert('Error deleting notification: ' + error.message);
+      }
+    }
+
+    function escapeHtml(text) {
+      if (typeof text !== 'string') return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Expose functions globally for onclick handlers
+    window.deleteNotification = deleteNotification;
+    window.toggleNotificationStatus = toggleNotificationStatus;
+
     // Routing
     function setRoute(route) {
       currentRoute = route;
@@ -431,6 +738,11 @@
         loadUsers(0);
       } else if (route === 'api-usage') {
         loadApiUsage();
+      } else if (route === 'notifications') {
+        loadNotificationSettings();
+        loadAllNotifications();
+      } else if (route === 'settings') {
+        // Settings page is empty for now
       }
       
       // Close sidebar on mobile after navigation
@@ -460,6 +772,183 @@
     // Initialize route from hash
     const initialHash = window.location.hash.slice(1) || 'dashboard';
     setRoute(initialHash);
+
+    const saveNotificationBtn = $('saveNotificationBtn');
+    const clearNotificationBtn = $('clearNotificationBtn');
+    if (saveNotificationBtn) {
+      saveNotificationBtn.addEventListener('click', () => {
+        const textarea = $('notificationMessage');
+        const value = textarea ? (textarea.value || '') : '';
+        saveNotification(value);
+      });
+    }
+    if (clearNotificationBtn) {
+      clearNotificationBtn.addEventListener('click', () => {
+        // Just clear the textarea in the modal, don't deactivate notifications
+        const textarea = $('notificationMessage');
+        if (textarea) textarea.value = '';
+        const statusEl = $('notificationStatus');
+        if (statusEl) {
+          statusEl.style.display = 'none';
+          statusEl.textContent = '';
+        }
+      });
+    }
+
+    // Notification modal open/close
+    const notificationModal = $('notificationModal');
+    const openNotificationModalBtn = $('openNotificationModalBtn');
+    const notificationModalCloseBtn = $('notificationModalCloseBtn');
+    const notificationModalCloseFooterBtn = $('notificationModalCloseFooterBtn');
+
+    function openNotificationModal() {
+      if (!notificationModal) return;
+      notificationModal.style.display = 'flex';
+      const textarea = $('notificationMessage');
+      if (textarea) textarea.focus();
+    }
+    function closeNotificationModal() {
+      if (!notificationModal) return;
+      notificationModal.style.display = 'none';
+    }
+
+    if (openNotificationModalBtn) {
+      openNotificationModalBtn.addEventListener('click', () => {
+        // Always start with an empty message when adding new
+        editingNotificationId = null;
+        loadNotificationSettings();
+        openNotificationModal();
+      });
+    }
+    if (notificationModalCloseBtn) {
+      notificationModalCloseBtn.addEventListener('click', () => {
+        closeNotificationModal();
+      });
+    }
+    if (notificationModalCloseFooterBtn) {
+      notificationModalCloseFooterBtn.addEventListener('click', () => {
+        closeNotificationModal();
+      });
+    }
+    if (notificationModal) {
+      notificationModal.addEventListener('click', (e) => {
+        if (e.target === notificationModal) {
+          closeNotificationModal();
+        }
+      });
+    }
+
+    function closeAllNotificationRowMenus() {
+      document.querySelectorAll('.tableRowMenu.open').forEach(el => {
+        el.classList.remove('open');
+        const btn = el.querySelector('.tableRowMenuBtn');
+        const menu = el.querySelector('.menu');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+        if (menu) menu.setAttribute('aria-hidden', 'true');
+      });
+    }
+
+    function toggleNotificationRowMenu(buttonEl) {
+      const wrapper = buttonEl ? buttonEl.closest('.tableRowMenu') : null;
+      if (!wrapper) return;
+      const isOpen = wrapper.classList.contains('open');
+      closeAllNotificationRowMenus();
+      if (!isOpen) {
+        wrapper.classList.add('open');
+        buttonEl.setAttribute('aria-expanded', 'true');
+        const menu = wrapper.querySelector('.menu');
+        if (menu) {
+          // Reset any previous positioning
+          menu.style.top = '';
+          menu.style.bottom = '';
+          menu.style.left = '';
+          menu.style.right = '';
+          // Use fixed positioning so we're not clipped by table/card containers
+          menu.style.position = 'fixed';
+          const btnRect = buttonEl.getBoundingClientRect();
+          const menuRect = menu.getBoundingClientRect();
+          const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+          const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+
+          const spaceBelow = viewportHeight - btnRect.bottom;
+          const spaceAbove = btnRect.top;
+
+          const estimatedHeight = menuRect.height || 160;
+
+          if (spaceBelow >= estimatedHeight || spaceBelow >= spaceAbove) {
+            // Show below button
+            menu.style.top = `${Math.round(btnRect.bottom + 6)}px`;
+            menu.style.bottom = 'auto';
+          } else {
+            // Show above button
+            menu.style.top = `${Math.round(btnRect.top - estimatedHeight - 6)}px`;
+            menu.style.bottom = 'auto';
+          }
+
+          // Horizontal adjustment to keep within viewport
+          const menuWidth = menuRect.width || 180;
+          let left = btnRect.left;
+          // If menu would overflow right edge, shift left
+          if (left + menuWidth > viewportWidth - 8) {
+            left = Math.max(8, viewportWidth - menuWidth - 8);
+          }
+          // Ensure not off left edge
+          if (left < 8) left = 8;
+          menu.style.left = `${Math.round(left)}px`;
+          menu.style.right = 'auto';
+
+          menu.setAttribute('aria-hidden', 'false');
+        }
+      }
+    }
+
+    // Reuse same behavior for user rows
+    function toggleUserRowMenu(buttonEl) {
+      toggleNotificationRowMenu(buttonEl);
+    }
+
+    document.addEventListener('click', (e) => {
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      document.querySelectorAll('.tableRowMenu.open').forEach(wrapper => {
+        if (!wrapper.contains(target)) {
+          wrapper.classList.remove('open');
+          const btn = wrapper.querySelector('.tableRowMenuBtn');
+          const menu = wrapper.querySelector('.menu');
+          if (btn) btn.setAttribute('aria-expanded', 'false');
+          if (menu) menu.setAttribute('aria-hidden', 'true');
+        }
+      });
+    });
+
+    // Edit existing notification helper (called from table)
+    function editNotification(buttonEl) {
+      if (!buttonEl) return;
+      const id = buttonEl.getAttribute('data-id');
+      const message = buttonEl.getAttribute('data-message') || '';
+      const btnLabel = buttonEl.getAttribute('data-button-label') || '';
+      const btnUrl = buttonEl.getAttribute('data-button-url') || '';
+      if (!id) return;
+      editingNotificationId = id;
+      const textarea = $('notificationMessage');
+      const statusEl = $('notificationStatus');
+      const btnLabelEl = $('notificationButtonLabel');
+      const btnUrlEl = $('notificationButtonUrl');
+      if (textarea) textarea.value = message || '';
+      if (btnLabelEl) btnLabelEl.value = btnLabel;
+      if (btnUrlEl) btnUrlEl.value = btnUrl;
+      if (statusEl) {
+        statusEl.style.display = 'none';
+        statusEl.textContent = '';
+      }
+      openNotificationModal();
+    }
+
+    // Expose helpers for inline onclick handlers
+    // (toggleNotificationStatus and deleteNotification are already exposed below)
+    window.editNotification = editNotification;
+    window.toggleNotificationRowMenu = toggleNotificationRowMenu;
+    window.toggleUserRowMenu = toggleUserRowMenu;
 
     function showError(msg) {
       if (errorEl) {
@@ -531,7 +1020,8 @@
       const tbody = $('usersTableBody');
       
       if (loader) loader.style.display = 'flex';
-      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px;"><div class="spinner"></div></td></tr>';
+      // Clear previous rows; rely on the top loader instead of a second spinner row
+      if (tbody) tbody.innerHTML = '';
       
       try {
         const res = await fetch(`/api/admin/users?limit=${pageSize}&skip=${page * pageSize}`, {
@@ -550,6 +1040,8 @@
             tbody.innerHTML = data.users.map(user => {
               const createdDate = new Date(user.created_at);
               const plan = user.plan || 'free';
+              const isAdmin = !!user.is_admin;
+              const planSelectId = `plan-select-${user.id}`;
               return `
                 <tr>
                   <td>${user.email}</td>
@@ -561,18 +1053,44 @@
                     ${user.email_verified ? '<span class="badge badge-verified">Verified</span>' : '<span style="color:#757575;">Not verified</span>'}
                   </td>
                   <td>
-                    ${user.is_admin ? '<span class="badge badge-admin">Admin</span>' : '<span style="color:#757575;">—</span>'}
+                    ${isAdmin ? '<span class="badge badge-admin">Admin</span>' : '<span style="color:#757575;">—</span>'}
                   </td>
                   <td>${createdDate.toLocaleDateString()}</td>
                   <td>
-                    <select onchange="updateUserPlan('${user.id}', this.value)" style="margin-right:8px;">
-                      <option value="free" ${plan === 'free' ? 'selected' : ''}>Free</option>
-                      <option value="pro" ${plan === 'pro' ? 'selected' : ''}>Pro</option>
-                      <option value="pro_plus" ${plan === 'pro_plus' ? 'selected' : ''}>Pro+</option>
-                    </select>
-                    <button class="btn btn-primary btn-sm" onclick="toggleAdmin('${user.id}', ${!user.is_admin})">
-                      ${user.is_admin ? 'Remove Admin' : 'Make Admin'}
-                    </button>
+                    <div class="tableRowMenu">
+                      <button
+                        type="button"
+                        class="btn btn-light btn-sm tableRowMenuBtn"
+                        onclick="toggleUserRowMenu(this)"
+                        aria-haspopup="menu"
+                        aria-expanded="false"
+                        title="Actions"
+                        style="padding:4px 10px; font-size:12px; border-radius:999px;"
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <circle cx="5" cy="12" r="1.5"></circle>
+                          <circle cx="12" cy="12" r="1.5"></circle>
+                          <circle cx="19" cy="12" r="1.5"></circle>
+                        </svg>
+                      </button>
+                      <div class="menu" role="menu" aria-hidden="true">
+                        <div style="padding:8px 12px; border-bottom:1px solid rgba(0,0,0,0.06);">
+                          <label for="${planSelectId}" style="display:block; font-size:11px; color:#757575; margin-bottom:4px;">Change plan</label>
+                          <select id="${planSelectId}" onchange="updateUserPlan('${user.id}', this.value)" style="width:100%; padding:6px 8px; border-radius:8px; border:1px solid rgba(0,0,0,0.16); font-size:12px;">
+                            <option value="free" ${plan === 'free' ? 'selected' : ''}>Free</option>
+                            <option value="pro" ${plan === 'pro' ? 'selected' : ''}>Pro</option>
+                            <option value="pro_plus" ${plan === 'pro_plus' ? 'selected' : ''}>Pro+</option>
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          class="menuItem"
+                          onclick="toggleAdmin('${user.id}', ${!isAdmin})"
+                        >
+                          ${isAdmin ? 'Remove admin' : 'Make admin'}
+                        </button>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               `;

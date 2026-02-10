@@ -9,7 +9,11 @@
 }
 .btn:hover { transform: translateY(-1px); }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-.btn-secondary { background: rgba(255,255,255,0.10); color: white; border: 1px solid rgba(255,255,255,0.16); }
+.btn-secondary {
+  background: rgba(0,0,0,0.04);
+  color: #111;
+  border: 1px solid rgba(0,0,0,0.18);
+}
 .btn-primary { background: #8b5cf6; color: white; }
 .btn-ghost { background: transparent; color: rgba(255,255,255,0.90); border: 1px solid rgba(255,255,255,0.16); }
 
@@ -46,7 +50,19 @@
 }
 
 .userMenu { position: relative; }
+.notificationMenu { position: relative; }
 .avatarBtn { position: relative; }
+.notificationBadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  background: #f44336;
+  border-radius: 50%;
+  border: 2px solid #0f1630;
+}
+.notificationMenu.open .menu { display: block; }
 .avatarCircle {
   width: 36px;
   height: 36px;
@@ -106,6 +122,16 @@
   margin-top: 10px;
   font-size: 13px;
   font-weight: 800;
+}
+
+.notification-banner {
+  background: rgba(25, 118, 210, 0.08);
+  color: #0d47a1;
+  border: 1px solid rgba(25, 118, 210, 0.2);
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 12px;
 }
 
 .paypalWrap {
@@ -257,22 +283,28 @@
 .tableWrap { width: 100%; overflow-x: auto; }
 .table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   background: #fff;
-  border: 1px solid #d0d0d0;
-  border-radius: 14px;
-  overflow: hidden;
+  border: none !important;
+  border-top: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  border-left: none !important;
+  border-radius: 0;
+  overflow: visible;
 }
 .table th, .table td {
   padding: 10px 12px;
   text-align: left;
-  border-bottom: 1px solid #d0d0d0;
-  border-right: 1px solid #d0d0d0;
+  border: none !important;
+  border-top: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  border-left: none !important;
   font-size: 13px;
 }
-.table th:last-child, .table td:last-child {
-  border-right: none;
-}
+.table th:last-child, .table td:last-child { border-right: none !important; }
 .table th {
   background: rgba(0,0,0,0.03);
   font-weight: 900;
@@ -295,6 +327,36 @@
 
 .modal-overlay {
   display: flex;
+}
+
+.tableRowMenu {
+  position: relative;
+  display: inline-block;
+}
+.tableRowMenu .menu {
+  min-width: auto;
+  width: max-content;
+  max-width: 260px;
+  z-index: 1000;
+}
+.tableRowMenu.open .menu {
+  display: block;
+}
+
+.notificationLinkBtn {
+  display: inline-block;
+  padding: 4px 10px;
+  margin-top: 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(76,29,149,0.3);
+  background: rgba(76,29,149,0.06);
+  color: #4c1d95;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.notificationLinkBtn:hover {
+  background: rgba(76,29,149,0.12);
 }
 
 

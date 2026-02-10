@@ -38,6 +38,10 @@ import {
   getTranscriptionUsageMsForPeriod,
   validateAuthSessionAndMaybeTouch,
   MeetingSession,
+  getActiveSystemNotification,
+  hasUserReadNotification,
+  markNotificationAsRead,
+  getNotificationsForUser,
 } from './database.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -105,6 +109,82 @@ app.get('/admin', servePublicHtml('admin.html'));
 // Health check endpoint
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'FinalRoundApp backend is running' });
+});
+
+// System notification for signed-in users (latest active, kept for backward compatibility)
+app.get('/api/notification', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const notif = await getActiveSystemNotification(userId);
+    if (!notif || !notif.isActive || !notif.message?.trim()) {
+      return res.json({ notification: null, isRead: true });
+    }
+    const isRead = notif._id ? await hasUserReadNotification(userId, notif._id.toString()) : false;
+    return res.json({
+      notification: {
+        id: notif._id?.toString(),
+        message: notif.message,
+        createdAt: notif.createdAt,
+        buttonLabel: notif.buttonLabel,
+        buttonUrl: notif.buttonUrl,
+      },
+      isRead,
+    });
+  } catch (error: any) {
+    console.error('Error fetching notification:', error);
+    return res.status(500).json({ error: error.message || 'Failed to fetch notification' });
+  }
+});
+
+// List notifications for signed-in users (active only, recent first)
+app.get('/api/notifications', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const limitRaw = req.query.limit as string | undefined;
+    const unreadOnlyRaw = req.query.unreadOnly as string | undefined;
+    let limit = 50;
+    if (limitRaw) {
+      const parsed = parseInt(limitRaw, 10);
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        limit = Math.min(parsed, 200);
+      }
+    }
+    const unreadOnly =
+      typeof unreadOnlyRaw === 'string'
+        ? unreadOnlyRaw === 'true' || unreadOnlyRaw === '1'
+        : false;
+
+    const notifications = await getNotificationsForUser(userId, { limit, unreadOnly });
+    const items = notifications.map((n) => ({
+      id: n._id?.toString(),
+      message: n.message,
+      createdAt: n.createdAt,
+      isActive: n.isActive,
+       buttonLabel: n.buttonLabel,
+       buttonUrl: n.buttonUrl,
+      isRead: Array.isArray(n.readBy) ? n.readBy.includes(userId) : false,
+    }));
+    return res.json({ notifications: items });
+  } catch (error: any) {
+    console.error('Error fetching notifications list:', error);
+    return res.status(500).json({ error: error.message || 'Failed to fetch notifications' });
+  }
+});
+
+// Mark notification as read
+app.post('/api/notification/read', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { notificationId } = req.body;
+    if (!notificationId || typeof notificationId !== 'string') {
+      return res.status(400).json({ error: 'notificationId is required' });
+    }
+    await markNotificationAsRead(userId, notificationId);
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error marking notification as read:', error);
+    return res.status(500).json({ error: error.message || 'Failed to mark notification as read' });
+  }
 });
 
 // Sitemap for SEO (uses BASE_URL from env, or falls back to request origin)
@@ -1760,7 +1840,7 @@ aiWss.on('connection', (ws: WebSocket) => {
             systemPrompt = providedSystemPrompt;
           } else {
             systemPrompt =
-              'You are HearNow, a meeting assistant. Summarize the meeting conversation so far into concise bullet points. Include key topics discussed, participant responses, and any notable points. If action items or follow-ups exist, list them separately.';
+              'You are FinalRoundApp, a meeting assistant. Summarize the meeting conversation so far into concise bullet points. Include key topics discussed, participant responses, and any notable points. If action items or follow-ups exist, list them separately.';
           }
           if (historyText.length > 0) {
             userPrompt = `Meeting transcript:\n${historyText}\n\nProvide a concise summary of this meeting.`;
@@ -1770,7 +1850,7 @@ aiWss.on('connection', (ws: WebSocket) => {
           break;
         case 'insights':
           systemPrompt =
-            'You are HearNow, a meeting assistant. Analyze the meeting transcript and provide key insights about the participants and discussion. Focus on strengths, areas of concern, communication style, technical knowledge, cultural fit, and overall assessment. Be objective and specific.';
+            'You are FinalRoundApp, a meeting assistant. Analyze the meeting transcript and provide key insights about the participants and discussion. Focus on strengths, areas of concern, communication style, technical knowledge, cultural fit, and overall assessment. Be objective and specific.';
           if (historyText.length > 0) {
             userPrompt = `Meeting transcript:\n${historyText}\n\nProvide key insights about this meeting and participants.`;
           } else {
@@ -1779,7 +1859,7 @@ aiWss.on('connection', (ws: WebSocket) => {
           break;
         case 'questions':
           systemPrompt =
-            'You are HearNow, a meeting assistant. Based on the meeting transcript so far, suggest 3-5 relevant follow-up questions or discussion points. Consider what has been discussed, what gaps exist, and what would help move the conversation forward. Format as a numbered list.';
+            'You are FinalRoundApp, a meeting assistant. Based on the meeting transcript so far, suggest 3-5 relevant follow-up questions or discussion points. Consider what has been discussed, what gaps exist, and what would help move the conversation forward. Format as a numbered list.';
           if (historyText.length > 0) {
             userPrompt = `Meeting transcript:\n${historyText}\n\nSuggest relevant follow-up questions or discussion points for this meeting.`;
           } else {
@@ -1790,7 +1870,7 @@ aiWss.on('connection', (ws: WebSocket) => {
           // Use provided system prompt or default
           const providedPrompt = typeof providedSystemPrompt === 'string' && providedSystemPrompt.trim().length > 0
             ? providedSystemPrompt.trim()
-            : 'You are HearNow, a meeting assistant. Reply helpfully and concisely to what was said. If the user asks a question, answer it. If the transcript is incomplete, ask one clarifying question.';
+            : 'You are FinalRoundApp, a meeting assistant. Reply helpfully and concisely to what was said. If the user asks a question, answer it. If the transcript is incomplete, ask one clarifying question.';
           
           // Enhance prompt to request concise, formatted responses
           const enhancedPrompt = `${providedPrompt}\n\nIMPORTANT: Keep responses concise and easy to scan. Use formatting to highlight key points:\n- Use **bold** for main answers or key takeaways\n- Use bullet points (•) for tips or action items\n- Keep paragraphs short (2-3 sentences max)\n- Lead with the most important information first`;

@@ -206,6 +206,17 @@ export interface LoginChallenge {
   ip: string;
 }
 
+// Simple system-wide notification banner (set by admin, shown to users)
+export interface SystemNotification {
+  _id?: ObjectId;
+  message: string;
+  createdAt: Date;
+  isActive: boolean;
+  readBy?: string[]; // Array of user IDs who have read this notification
+  buttonLabel?: string;
+  buttonUrl?: string;
+}
+
 let client: MongoClient | null = null;
 let db: Db | null = null;
 let usersCollection: Collection<User> | null = null;
@@ -298,6 +309,11 @@ export const connectDB = async (): Promise<void> => {
       await paymentTransactionsCollection.createIndex({ subscriptionId: 1 });
       await paymentTransactionsCollection.createIndex({ transactionId: 1 }, { unique: true });
     }
+
+    // System notifications (simple admin-set banner)
+    try {
+      await db.collection<SystemNotification>('system_notifications').createIndex({ isActive: 1, createdAt: -1 });
+    } catch (_) {}
 
     // Usage tracking collections (indexes only; collection handles are created on demand)
     try {
@@ -1985,6 +2001,188 @@ export const getAdminApiUsageStats = async (startDate?: Date, endDate?: Date) =>
       totalSessions: deepgramData.totalSessions,
     },
   };
+};
+
+// ----- System-wide notification helpers -----
+
+/** Get the currently active system notification (if any). */
+export const getActiveSystemNotification = async (userId?: string): Promise<SystemNotification | null> => {
+  await connectDB();
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const coll = db.collection<SystemNotification>('system_notifications');
+  const doc = await coll
+    .find({ isActive: true })
+    .sort({ createdAt: -1 })
+    .limit(1)
+    .next();
+  return doc || null;
+};
+
+/** Check if user has read the active notification. */
+export const hasUserReadNotification = async (userId: string, notificationId: string): Promise<boolean> => {
+  await connectDB();
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const coll = db.collection<SystemNotification>('system_notifications');
+  const doc = await coll.findOne({ _id: new ObjectId(notificationId) });
+  if (!doc) return false;
+  return Array.isArray(doc.readBy) && doc.readBy.includes(userId);
+};
+
+/** Get active notifications for a user (optionally unread-only). */
+export const getNotificationsForUser = async (
+  userId: string,
+  options: { limit?: number; unreadOnly?: boolean } = {}
+): Promise<SystemNotification[]> => {
+  await connectDB();
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const { limit = 50, unreadOnly = false } = options;
+  const coll = db.collection<SystemNotification>('system_notifications');
+  const query: Record<string, any> = {};
+  if (unreadOnly) {
+    // Only active, unread notifications for this user (used for badge)
+    query.isActive = true;
+    query.$or = [
+      { readBy: { $exists: false } },
+      { readBy: { $ne: userId } },
+    ];
+  }
+  const notifications = await coll
+    .find(query)
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .toArray();
+  return notifications;
+};
+
+/** Mark notification as read for a user. */
+export const markNotificationAsRead = async (userId: string, notificationId: string): Promise<void> => {
+  await connectDB();
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const coll = db.collection<SystemNotification>('system_notifications');
+  await coll.updateOne(
+    { _id: new ObjectId(notificationId) },
+    { $addToSet: { readBy: userId } } // Add userId to readBy array if not already present
+  );
+};
+
+/** Set (or replace) the active system notification message. */
+export const setSystemNotification = async (
+  message: string,
+  buttonLabel?: string,
+  buttonUrl?: string
+): Promise<SystemNotification> => {
+  await connectDB();
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const coll = db.collection<SystemNotification>('system_notifications');
+  const now = new Date();
+  // Don't deactivate previous notifications - they remain active until manually deactivated
+  const insertDoc: SystemNotification = {
+    message,
+    createdAt: now,
+    isActive: true,
+    readBy: [],
+  };
+  if (typeof buttonLabel === 'string' && buttonLabel.trim()) {
+    insertDoc.buttonLabel = buttonLabel.trim();
+  }
+  if (typeof buttonUrl === 'string' && buttonUrl.trim()) {
+    insertDoc.buttonUrl = buttonUrl.trim();
+  }
+  const insertResult = await coll.insertOne(insertDoc);
+  return {
+    _id: insertResult.insertedId,
+    message,
+    createdAt: now,
+    isActive: true,
+    buttonLabel: insertDoc.buttonLabel,
+    buttonUrl: insertDoc.buttonUrl,
+  };
+};
+
+/** Clear any active system notification (no banner shown). */
+export const clearSystemNotification = async (): Promise<void> => {
+  await connectDB();
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const coll = db.collection<SystemNotification>('system_notifications');
+  await coll.updateMany({ isActive: true }, { $set: { isActive: false } });
+};
+
+/** Get all notifications (active and inactive) for admin management. */
+export const getAllNotifications = async (limit: number = 100): Promise<SystemNotification[]> => {
+  await connectDB();
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const coll = db.collection<SystemNotification>('system_notifications');
+  const notifications = await coll
+    .find({})
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .toArray();
+  return notifications;
+};
+
+/** Delete a notification by ID. */
+export const deleteNotification = async (notificationId: string): Promise<boolean> => {
+  await connectDB();
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const coll = db.collection<SystemNotification>('system_notifications');
+  const result = await coll.deleteOne({ _id: new ObjectId(notificationId) });
+  return result.deletedCount > 0;
+};
+
+/** Update notification active status. */
+export const updateNotificationStatus = async (notificationId: string, isActive: boolean): Promise<boolean> => {
+  await connectDB();
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const coll = db.collection<SystemNotification>('system_notifications');
+  const result = await coll.updateOne(
+    { _id: new ObjectId(notificationId) },
+    { $set: { isActive } }
+  );
+  return result.modifiedCount > 0;
+};
+
+/** Update notification message text (and optional button metadata). */
+export const updateNotificationMessage = async (
+  notificationId: string,
+  message: string,
+  buttonLabel?: string,
+  buttonUrl?: string
+): Promise<boolean> => {
+  await connectDB();
+  if (!db) {
+    throw new Error('Database not connected');
+  }
+  const coll = db.collection<SystemNotification>('system_notifications');
+  const trimmed = (message || '').trim();
+  const update: Partial<SystemNotification> = { message: trimmed };
+  if (buttonLabel !== undefined) {
+    const t = buttonLabel.trim();
+    update.buttonLabel = t || undefined;
+  }
+  if (buttonUrl !== undefined) {
+    const t = buttonUrl.trim();
+    update.buttonUrl = t || undefined;
+  }
+  const result = await coll.updateOne({ _id: new ObjectId(notificationId) }, { $set: update });
+  return result.modifiedCount > 0;
 };
 
 export default { connectDB, closeDB, getUsersCollection };

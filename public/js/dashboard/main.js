@@ -10,6 +10,7 @@ function routeMeta(route) {
     case 'manage': return { title: 'Manage Subscription', sub: 'Manage your current subscription' };
     case 'docs': return { title: 'Docs', sub: 'Product and API documentation' };
     case 'contact': return { title: 'Contact us', sub: 'Get help from support' };
+    case 'notifications': return { title: 'Notifications', sub: 'All messages about your account' };
     default: return { title: 'Overview', sub: 'Plan snapshot and quick actions' };
   }
 }
@@ -79,6 +80,12 @@ function setRoute(route) {
     loadInvoicesTable();
   }
 
+  if (r === 'notifications') {
+    if (typeof loadNotificationsPage === 'function') {
+      loadNotificationsPage();
+    }
+  }
+
   if (r === 'manage') {
     // Ensure billing info is loaded (load() will automatically render subscription management)
     if (!billingInfoLoaded) {
@@ -129,6 +136,11 @@ async function load() {
     refreshBtn.setAttribute('title', 'Refreshing…');
   }
   billingInfoLoaded = false;
+
+  // Load system notification badge (check for unread messages)
+  if (typeof window.loadNotificationBadge === 'function') {
+    await window.loadNotificationBadge();
+  }
 
   // Show skeletons for KPIs (preserve structure, just show skeleton content)
   const planValueEl = $('planValue');
@@ -372,8 +384,234 @@ async function load() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeUserMenu();
+      closeNotificationMenu();
       setSidebarOpen(false);
     }
+  });
+
+  // Notification bell menu
+  const notificationMenuWrap = $('notificationMenuWrap');
+  const notificationBellBtn = $('notificationBellBtn');
+  const notificationMenu = $('notificationMenu');
+  const notificationContent = $('notificationContent');
+  const notificationBadge = $('notificationBadge');
+
+  function closeNotificationMenu() {
+    if (!notificationMenuWrap || !notificationBellBtn || !notificationMenu) return;
+    notificationMenuWrap.classList.remove('open');
+    notificationBellBtn.setAttribute('aria-expanded', 'false');
+    notificationMenu.setAttribute('aria-hidden', 'true');
+  }
+  function toggleNotificationMenu() {
+    if (!notificationMenuWrap || !notificationBellBtn || !notificationMenu) return;
+    const open = notificationMenuWrap.classList.toggle('open');
+    notificationBellBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    notificationMenu.setAttribute('aria-hidden', open ? 'false' : 'true');
+    // Load notification content when opening
+    if (open) {
+      loadNotificationContent();
+    }
+  }
+
+  let currentNotificationIds = [];
+
+  async function loadNotificationBadge() {
+    if (!notificationBadge) return;
+    try {
+      const res = await fetch('/api/notifications?limit=1&unreadOnly=true', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      const data = await res.json().catch(() => ({}));
+      const notifications = Array.isArray(data.notifications) ? data.notifications : [];
+      if (res.ok && notifications.length > 0) {
+        notificationBadge.style.display = 'block';
+        currentNotificationIds = notifications.map(n => n.id).filter(Boolean);
+      } else {
+        notificationBadge.style.display = 'none';
+        currentNotificationIds = [];
+      }
+    } catch (_) {
+      notificationBadge.style.display = 'none';
+      currentNotificationIds = [];
+    }
+  }
+  
+  // Expose to window so load() can call it
+  window.loadNotificationBadge = loadNotificationBadge;
+
+  async function loadNotificationContent(showAll = false) {
+    if (!notificationContent) return;
+    try {
+      const limit = showAll ? 100 : 3;
+      const res = await fetch(`/api/notifications?limit=${limit}`, {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      const data = await res.json().catch(() => ({}));
+      const notifications = Array.isArray(data.notifications) ? data.notifications : [];
+
+      if (res.ok && notifications.length > 0) {
+        currentNotificationIds = notifications.map(n => n.id).filter(Boolean);
+
+        const listHtml = notifications.map((n) => {
+          const createdAt = n.createdAt ? new Date(n.createdAt) : null;
+          const timeText = createdAt && Number.isFinite(createdAt.getTime())
+            ? createdAt.toLocaleString()
+            : '';
+          const isRead = !!n.isRead;
+          const bgColor = isRead ? 'rgba(0,0,0,0.02)' : 'rgba(25,118,210,0.06)';
+          const borderColor = isRead ? 'rgba(0,0,0,0.04)' : 'rgba(25,118,210,0.25)';
+          const buttonHtml = n.buttonUrl
+            ? `<div style="margin-top:6px;"><a href="${escapeHtml(n.buttonUrl)}" target="_blank" rel="noopener noreferrer" class="notificationLinkBtn">${escapeHtml(n.buttonLabel || 'Open')}</a></div>`
+            : '';
+          return `
+            <div style="padding:10px 10px; margin:4px 0; border-radius:8px; border:1px solid ${borderColor}; background:${bgColor};">
+              ${timeText ? `<div style="font-size:12px; color:#555; margin-bottom:4px;">${escapeHtml(timeText)}</div>` : ''}
+              <div style="white-space:pre-wrap; font-size:13px; color:#111;">${renderNotificationMessage(n.message || '')}</div>
+              ${buttonHtml}
+            </div>
+          `;
+        }).join('');
+
+        notificationContent.innerHTML = `
+          <div style="max-height:${showAll ? '320px' : '260px'}; overflow-y:auto; padding-right:4px;">
+            ${listHtml}
+          </div>
+          ${
+            showAll
+              ? ''
+              : '<button id="viewAllNotificationsBtn" class="menuItem" style="width:100%; text-align:center; border-top:1px solid rgba(0,0,0,0.08); background:transparent; font-size:12px; color:#4c1d95; text-decoration:underline;">View all messages</button>'
+          }
+        `;
+
+        if (!showAll) {
+          const viewAllBtn = document.getElementById('viewAllNotificationsBtn');
+          if (viewAllBtn) {
+            viewAllBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              // Navigate to full notifications page and ensure it loads
+              window.location.hash = '#notifications';
+              setRoute('notifications');
+              if (typeof loadNotificationsPage === 'function') {
+                loadNotificationsPage();
+              }
+              closeNotificationMenu();
+            });
+          }
+        }
+
+        // Mark all unread notifications in this batch as read
+        const unreadIds = notifications
+          .filter((n) => n.id && !n.isRead)
+          .map((n) => n.id);
+        if (unreadIds.length > 0) {
+          try {
+            await Promise.all(
+              unreadIds.map((id) =>
+                fetch('/api/notification/read', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                  },
+                  body: JSON.stringify({ notificationId: id }),
+                })
+              )
+            );
+          } catch (_) {
+            // ignore errors
+          }
+          // Refresh badge after marking as read
+          loadNotificationBadge();
+        }
+      } else {
+        notificationContent.innerHTML = '<div style="text-align:center; color:#757575; padding:20px;">No notifications</div>';
+        currentNotificationIds = [];
+      }
+    } catch (_) {
+      notificationContent.innerHTML = '<div style="text-align:center; color:#757575; padding:20px;">Failed to load notifications</div>';
+      currentNotificationIds = [];
+    }
+  }
+
+  // Full notifications page (route: #notifications)
+  async function loadNotificationsPage() {
+    const container = $('notificationsPageContent');
+    if (!container) return;
+    container.innerHTML = `
+      <div class="loader">
+        <div class="spinner"></div>
+      </div>
+    `;
+    try {
+      const res = await fetch('/api/notifications?limit=100', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      const data = await res.json().catch(() => ({}));
+      const notifications = Array.isArray(data.notifications) ? data.notifications : [];
+      if (!res.ok) {
+        container.innerHTML = `<div class="error" style="display:block;">${escapeHtml(data.error || 'Failed to load notifications.')}</div>`;
+        return;
+      }
+      if (notifications.length === 0) {
+        container.innerHTML = '<div class="muted" style="padding:20px 0;">No notifications yet.</div>';
+        return;
+      }
+      const itemsHtml = notifications.map((n) => {
+        const createdAt = n.createdAt ? new Date(n.createdAt) : null;
+        const timeText = createdAt && Number.isFinite(createdAt.getTime())
+          ? createdAt.toLocaleString()
+          : '';
+        const isRead = !!n.isRead;
+        const bgColor = isRead ? 'rgba(0,0,0,0.02)' : 'rgba(25,118,210,0.06)';
+        const borderColor = isRead ? 'rgba(0,0,0,0.04)' : 'rgba(25,118,210,0.25)';
+        const buttonHtml = n.buttonUrl
+          ? `<div style="margin-top:6px;"><a href="${escapeHtml(n.buttonUrl)}" target="_blank" rel="noopener noreferrer" class="notificationLinkBtn">${escapeHtml(n.buttonLabel || 'Open')}</a></div>`
+          : '';
+        return `
+          <div style="padding:10px 12px; margin:6px 0; border-radius:10px; border:1px solid ${borderColor}; background:${bgColor};">
+            ${timeText ? `<div style="font-size:12px; color:#555; margin-bottom:4px;">${escapeHtml(timeText)}</div>` : ''}
+            <div style="white-space:pre-wrap; font-size:13px; color:#111;">${renderNotificationMessage(n.message || '')}</div>
+            ${buttonHtml}
+          </div>
+        `;
+      }).join('');
+      container.innerHTML = itemsHtml;
+    } catch (e) {
+      container.innerHTML = '<div class="error" style="display:block;">Failed to load notifications.</div>';
+    }
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Render notification message and auto-convert URLs into link buttons
+  function renderNotificationMessage(raw) {
+    if (typeof raw !== 'string' || !raw) return '';
+    // Escape HTML first so user text is safe
+    let escaped = escapeHtml(raw);
+    // Simple URL detection (http/https)
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    escaped = escaped.replace(urlRegex, (url) => {
+      const safeUrl = url;
+      return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="notificationLinkBtn">${safeUrl}</a>`;
+    });
+    return escaped;
+  }
+
+  if (notificationBellBtn) {
+    notificationBellBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleNotificationMenu();
+    });
+  }
+  document.addEventListener('click', (e) => {
+    if (!notificationMenuWrap) return;
+    const t = e.target;
+    if (!(t instanceof Node)) return;
+    if (!notificationMenuWrap.contains(t)) closeNotificationMenu();
   });
 
   const refreshBtn = $('refreshBtn');
