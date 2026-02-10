@@ -107,6 +107,22 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'FinalRoundApp backend is running' });
 });
 
+// Sitemap for SEO (uses BASE_URL from env, or falls back to request origin)
+app.get('/sitemap.xml', (req: Request, res: Response) => {
+  const baseUrl = (process.env.BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  const lastmod = new Date().toISOString().split('T')[0];
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${baseUrl}/</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>`;
+  res.type('application/xml').send(xml);
+});
+
 // Authentication routes
 app.use('/api/auth', authRoutes);
 app.use('/api/billing/paypal', paypalRoutes);
