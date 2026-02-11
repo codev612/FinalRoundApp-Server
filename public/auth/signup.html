@@ -244,9 +244,9 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    successDiv.textContent = result.message || 'Account created! Please check your email to verify your account.';
-                    successDiv.style.display = 'block';
-                    form.reset();
+                    // Redirect to verification page with email
+                    const email = String(formData.get('email') || '').trim();
+                    window.location.href = `/auth/verify-email?email=${encodeURIComponent(email)}`;
                 } else {
                     errorDiv.textContent = result.error || 'An error occurred';
                     errorDiv.style.display = 'block';

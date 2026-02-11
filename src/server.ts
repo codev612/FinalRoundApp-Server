@@ -113,6 +113,7 @@ app.get('/download', servePublicHtml('download.html'));
 app.get('/dashboard', servePublicHtml('dashboard.html'));
 app.get('/auth/signin', servePublicHtml('auth/signin.html'));
 app.get('/auth/signup', servePublicHtml('auth/signup.html'));
+app.get('/auth/verify-email', servePublicHtml('auth/verify-email.html'));
 app.get('/auth/forgot-password', servePublicHtml('auth/forgot-password.html'));
 app.get('/auth/reset-password', servePublicHtml('auth/reset-password.html'));
 app.get('/auth/security-check', servePublicHtml('auth/security-check.html'));

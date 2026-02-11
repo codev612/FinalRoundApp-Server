@@ -565,15 +565,51 @@
   </div>
 
   <script>
-    const token = localStorage.getItem('token');
-    if (!token) window.location.href = '/auth/signin';
+    (async function init() {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        window.location.href = '/auth/signin';
+        return;
+      }
 
-    const $ = (id) => document.getElementById(id);
-    const errorEl = $('error');
-    let currentRoute = 'dashboard';
-    let currentPage = 0;
-    const pageSize = 20;
-    let totalUsers = 0;
+      // Check if user is admin, redirect if not
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            window.location.href = '/auth/signin';
+            return;
+          }
+          throw new Error('Failed to verify admin status');
+        }
+        const data = await res.json();
+        if (!data.user || !data.user.is_admin) {
+          window.location.href = '/auth/signin';
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+        window.location.href = '/auth/signin';
+        return;
+      }
+
+      // Helper function to handle API errors (especially 401/403)
+      function handleApiError(res, data) {
+        if (res.status === 401 || res.status === 403) {
+          window.location.href = '/auth/signin';
+          return true;
+        }
+        return false;
+      }
+
+      const $ = (id) => document.getElementById(id);
+      const errorEl = $('error');
+      let currentRoute = 'dashboard';
+      let currentPage = 0;
+      const pageSize = 20;
+      let totalUsers = 0;
 
     // Sidebar toggle functionality
     const sidebar = $('sidebar');
@@ -1083,6 +1119,7 @@
           headers: { 'Authorization': 'Bearer ' + token }
         });
         const data = await res.json();
+        if (handleApiError(res, data)) return;
         if (!res.ok) throw new Error(data.error || 'Failed to load stats');
         
         const statsEl = $('stats');
@@ -1788,6 +1825,7 @@
     } else if (currentRoute === 'desktop-apps') {
       loadDesktopApps();
     }
+    })(); // End of init function
   </script>
 </body>
 </html>

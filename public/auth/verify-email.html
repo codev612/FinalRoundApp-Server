@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/imgs/favicon.png">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Verify Email - FinalRoundApp</title>
+  <!-- Material Design CSS -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/material-components-web@14.0.0/dist/material-components-web.min.css">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 20px;
+      margin: 0;
+    }
+    .container {
+      background: white;
+      border-radius: 4px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.1);
+      padding: 40px;
+      max-width: 420px;
+      width: 100%;
+    }
+    .logo-container {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .logo-container img {
+      height: 72px;
+      width: auto;
+      object-fit: contain;
+    }
+    h1 { color:#212121; margin-bottom: 8px; text-align:center; font-weight: 400; font-size: 24px; }
+    .subtitle { color:#757575; margin-bottom: 16px; text-align:center; font-size: 14px; }
+    .hint { color:#757575; font-size: 13px; margin-bottom: 24px; text-align:center; }
+    .error {
+      background:#ffebee; color:#c62828; padding: 16px; border-radius: 4px;
+      margin-bottom: 24px; display:none; font-size: 14px;
+    }
+    .success {
+      background:#e8f5e9; color:#2e7d32; padding: 16px; border-radius: 4px;
+      margin-bottom: 24px; display:none; font-size: 14px;
+    }
+    .form-group { margin-bottom: 24px; }
+    label { display:block; margin-bottom: 4px; color:#212121; font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    input {
+      width: 100%;
+      padding: 12px 0;
+      border: none;
+      border-bottom: 1px solid #757575;
+      font-size: 24px;
+      letter-spacing: 8px;
+      font-weight: 500;
+      text-align: center;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+      background: transparent;
+      transition: border-color 0.2s;
+    }
+    input:focus { outline:none; border-bottom: 2px solid #1976d2; }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: #1976d2;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .btn:hover { background:#1565c0; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+    .btn:disabled { background:#bdbdbd; cursor:not-allowed; box-shadow:none; }
+    .link { text-align:center; margin-top: 24px; font-size: 14px; }
+    .link a { color:#1976d2; text-decoration:none; }
+    .link a:hover { text-decoration: underline; }
+    .resend-link {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 13px;
+    }
+    .resend-link a {
+      color: #1976d2;
+      text-decoration: none;
+    }
+    .resend-link a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo-container">
+      <a href="/">
+        <img src="/imgs/logo.png" alt="FinalRoundApp" />
+      </a>
+    </div>
+    <h1>Verify your email</h1>
+    <p class="subtitle">Enter the 6-digit code sent to your email</p>
+    <p class="hint" id="emailHint"></p>
+
+    <div class="error" id="error"></div>
+    <div class="success" id="success"></div>
+
+    <form id="form">
+      <div class="form-group">
+        <label for="code">Verification code</label>
+        <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" required />
+      </div>
+      <button type="submit" class="btn" id="submitBtn">Verify</button>
+    </form>
+
+    <div class="resend-link">
+      <a href="#" id="resendLink">Resend code</a>
+    </div>
+
+    <div class="link">
+      <a href="/auth/signin">Back to sign in</a>
+    </div>
+  </div>
+
+  <script>
+    const errorDiv = document.getElementById('error');
+    const successDiv = document.getElementById('success');
+    const submitBtn = document.getElementById('submitBtn');
+    const form = document.getElementById('form');
+    const codeEl = document.getElementById('code');
+    const emailHint = document.getElementById('emailHint');
+    const resendLink = document.getElementById('resendLink');
+
+    // Get email from URL parameter
+    const params = new URLSearchParams(window.location.search);
+    const email = params.get('email');
+
+    if (!email) {
+      // If no email in URL, redirect to signup
+      window.location.href = '/auth/signup';
+      throw new Error('Email parameter required');
+    }
+
+    emailHint.textContent = `Code sent to ${email}`;
+
+    // Resend verification code
+    resendLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      errorDiv.style.display = 'none';
+      successDiv.style.display = 'none';
+      resendLink.style.pointerEvents = 'none';
+      resendLink.textContent = 'Sending...';
+
+      try {
+        const res = await fetch('/api/auth/resend-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || data.message || ('HTTP ' + res.status));
+        successDiv.textContent = 'Verification code resent. Please check your email.';
+        successDiv.style.display = 'block';
+      } catch (err) {
+        errorDiv.textContent = String(err.message || err);
+        errorDiv.style.display = 'block';
+      } finally {
+        resendLink.style.pointerEvents = 'auto';
+        resendLink.textContent = 'Resend code';
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorDiv.style.display = 'none';
+      successDiv.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Verifying…';
+      try {
+        const code = String(codeEl.value || '').trim();
+        if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+          throw new Error('Please enter a valid 6-digit code');
+        }
+        const res = await fetch('/api/auth/verify-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, code })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || data.message || ('HTTP ' + res.status));
+        successDiv.textContent = data.message || 'Email verified successfully!';
+        successDiv.style.display = 'block';
+        // Redirect to sign in after 2 seconds
+        setTimeout(() => {
+          window.location.href = '/auth/signin';
+        }, 2000);
+      } catch (err) {
+        errorDiv.textContent = String(err.message || err);
+        errorDiv.style.display = 'block';
+        codeEl.value = '';
+        codeEl.focus();
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Verify';
+      }
+    });
+
+    // Auto-focus code input
+    codeEl.focus();
+  </script>
+</body>
+</html>

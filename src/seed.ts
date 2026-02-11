@@ -57,8 +57,8 @@ async function seedUser() {
     await markEmailVerified(user.id);
     console.log('Email marked as verified');
 
-    // Set as admin (optional - set ADMIN=true in environment or pass as argument)
-    const shouldBeAdmin = process.env.ADMIN === 'true' || process.argv.includes('--admin');
+    // Set as admin by default (can be disabled with ADMIN=false or --no-admin)
+    const shouldBeAdmin = process.env.ADMIN !== 'false' && !process.argv.includes('--no-admin');
     if (shouldBeAdmin) {
       await setUserAdmin(user.id, true);
       console.log('User set as admin');
@@ -68,9 +68,7 @@ async function seedUser() {
     console.log(`   Email: ${email}`);
     console.log(`   Password: ${password}`);
     console.log(`   Email verified: true`);
-    if (shouldBeAdmin) {
-      console.log(`   Admin: true`);
-    }
+    console.log(`   Admin: ${shouldBeAdmin}`);
     console.log('');
 
     await closeDB();
