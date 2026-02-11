@@ -743,7 +743,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
         name: user.name,
         email_verified: user.email_verified,
         created_at: user.created_at,
-        is_admin: user.is_admin || false,
+        is_admin: fullUser?.is_admin || false,
       },
       emailChange: {
         pendingEmail,
