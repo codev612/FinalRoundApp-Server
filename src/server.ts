@@ -1671,7 +1671,6 @@ wss.on('connection', (ws: WebSocket) => {
     const durationMs = Math.floor(totalBytesSentToDeepgram / 32); // linear16 16kHz
     try {
       await saveTranscriptionUsage(userId, durationMs, undefined);
-      console.log(`[Transcription] Saved Deepgram usage: ${durationMs}ms for user ${userId}`);
     } catch (err: any) {
       console.error('[Transcription] Error saving Deepgram usage:', err);
     } finally {
@@ -1702,7 +1701,6 @@ wss.on('connection', (ws: WebSocket) => {
         const isInterim = data.is_final === false;
         // Ensure source is correctly preserved from closure
         const transcriptSource = source; // Use closure variable to ensure correct source
-        console.log(`[DEBUG] Sending transcript from ${transcriptSource} connection: "${transcript.substring(0, 50)}..."`);
         ws.send(
           JSON.stringify({
             type: 'transcript',
@@ -1747,8 +1745,6 @@ wss.on('connection', (ws: WebSocket) => {
         // We only support JSON messages from the Flutter client.
         return;
       }
-
-      console.log('WS /listen message:', data?.type, data?.source ? `source=${data.source}` : '');
 
       if (data.type === 'start') {
         // Check if API key is set
@@ -1817,7 +1813,6 @@ wss.on('connection', (ws: WebSocket) => {
         }
         
         if (source === 'system' && !deepgramSystem) {
-          console.log('[DEBUG] Auto-initializing deepgramSystem connection (audio received before start)');
           try {
             if (!process.env.DEEPGRAM_API_KEY) {
               console.error('Deepgram API key not configured');
@@ -1835,15 +1830,12 @@ wss.on('connection', (ws: WebSocket) => {
           }
         }
         
-        // Debug logging with explicit checks
         if (source === 'system') {
-          console.log(`[DEBUG] Routing SYSTEM audio - deepgramSystem available: ${!!deepgramSystem}, deepgramMic available: ${!!deepgramMic}`);
           if (!deepgramSystem) {
             console.error(`[ERROR] System audio received but deepgramSystem is not available!`);
             return;
           }
         } else if (source === 'mic') {
-          console.log(`[DEBUG] Routing MIC audio - deepgramMic available: ${!!deepgramMic}, deepgramSystem available: ${!!deepgramSystem}`);
           if (!deepgramMic) {
             console.error(`[ERROR] Mic audio received but deepgramMic is not available!`);
             return;
@@ -1867,7 +1859,6 @@ wss.on('connection', (ws: WebSocket) => {
         try {
           const audioBuffer = Buffer.from(data.audio, 'base64');
           totalBytesSentToDeepgram += audioBuffer.length;
-          console.log(`[DEBUG] Sending ${source} audio to ${source === 'system' ? 'deepgramSystem' : 'deepgramMic'} (${audioBuffer.length} bytes)`);
           target.send(audioBuffer);
         } catch (error: any) {
           console.error(`[ERROR] Error sending audio to Deepgram (${source}):`, error);
@@ -1896,8 +1887,7 @@ wss.on('connection', (ws: WebSocket) => {
     }
   });
 
-  ws.on('close', async (code: number, reason: Buffer) => {
-    console.log('Client disconnected', { code, reason: reason?.toString?.() ?? '' });
+  ws.on('close', async (_code: number, _reason: Buffer) => {
     await saveDeepgramUsageForSession();
     if (deepgramMic) deepgramMic.finish();
     if (deepgramSystem) deepgramSystem.finish();
