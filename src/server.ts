@@ -1661,6 +1661,23 @@ wss.on('connection', (ws: WebSocket) => {
 
   let deepgramMic: any = null;
   let deepgramSystem: any = null;
+  // Track bytes sent to Deepgram for usage (linear16 @ 16kHz = 32 bytes/ms)
+  let totalBytesSentToDeepgram = 0;
+
+  const saveDeepgramUsageForSession = async () => {
+    if (totalBytesSentToDeepgram <= 0) return;
+    const userId = (ws as AuthenticatedWebSocket).user?.userId;
+    if (!userId) return;
+    const durationMs = Math.floor(totalBytesSentToDeepgram / 32); // linear16 16kHz
+    try {
+      await saveTranscriptionUsage(userId, durationMs, undefined);
+      console.log(`[Transcription] Saved Deepgram usage: ${durationMs}ms for user ${userId}`);
+    } catch (err: any) {
+      console.error('[Transcription] Error saving Deepgram usage:', err);
+    } finally {
+      totalBytesSentToDeepgram = 0;
+    }
+  };
 
   const startDeepgram = (source: 'mic' | 'system') => {
     const live = deepgram.listen.live({
@@ -1746,7 +1763,8 @@ wss.on('connection', (ws: WebSocket) => {
 
         // Initialize Deepgram live connections (mic + system)
         console.log('Starting Deepgram connections (mic + system)...');
-        
+        totalBytesSentToDeepgram = 0; // Reset for new session
+
         try {
           if (deepgramMic) {
             deepgramMic.finish();
@@ -1848,6 +1866,7 @@ wss.on('connection', (ws: WebSocket) => {
         // Forward audio data to Deepgram (per-source session)
         try {
           const audioBuffer = Buffer.from(data.audio, 'base64');
+          totalBytesSentToDeepgram += audioBuffer.length;
           console.log(`[DEBUG] Sending ${source} audio to ${source === 'system' ? 'deepgramSystem' : 'deepgramMic'} (${audioBuffer.length} bytes)`);
           target.send(audioBuffer);
         } catch (error: any) {
@@ -1855,6 +1874,8 @@ wss.on('connection', (ws: WebSocket) => {
           ws.send(JSON.stringify({ type: 'error', message: 'Error processing audio' }));
         }
       } else if (data.type === 'stop') {
+        // Save Deepgram usage before closing connections
+        await saveDeepgramUsageForSession();
         // Close Deepgram connections
         console.log('Stopping transcription (mic + system)...');
         if (deepgramMic) {
@@ -1875,8 +1896,9 @@ wss.on('connection', (ws: WebSocket) => {
     }
   });
 
-  ws.on('close', (code: number, reason: Buffer) => {
+  ws.on('close', async (code: number, reason: Buffer) => {
     console.log('Client disconnected', { code, reason: reason?.toString?.() ?? '' });
+    await saveDeepgramUsageForSession();
     if (deepgramMic) deepgramMic.finish();
     if (deepgramSystem) deepgramSystem.finish();
   });
