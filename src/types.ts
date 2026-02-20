@@ -26,12 +26,18 @@ export interface StopMessage extends WSMessage {
   type: 'stop';
 }
 
+export interface PreviousAiResponse {
+  question: string;
+  response: string;
+}
+
 export interface AIRequestMessage extends WSMessage {
   type: 'ai_request';
   requestId?: string;
   turns: Array<{ source: string; text: string }>;
   mode?: 'summary' | 'insights' | 'questions' | 'reply';
   question?: string;
+  previousAiResponses?: PreviousAiResponse[];
 }
 
 export interface AICancelMessage extends WSMessage {

@@ -1357,14 +1357,34 @@ app.post('/ai/respond', authenticate, async (req: AuthRequest, res: Response) =>
       });
     }
 
-    const { turns, mode, question, systemPrompt: providedSystemPrompt, model: requestedModel, imagePngBase64, imagesPngBase64 } = req.body ?? {};
+    const { turns, mode, question, systemPrompt: providedSystemPrompt, model: requestedModel, imagePngBase64, imagesPngBase64, previousAiResponses } = req.body ?? {};
     if (!Array.isArray(turns)) {
       return res.status(400).json({ error: 'Missing turns[]' });
     }
 
     const questionText = typeof question === 'string' ? question.trim() : '';
-    if (questionText.length > 800) {
-      return res.status(400).json({ error: 'Question too long (max 800 chars)' });
+    if (questionText.length > 2000) {
+      return res.status(400).json({ error: 'Question too long (max 2000 chars)' });
+    }
+    
+    // Process previous AI responses for context (up to 3 most recent)
+    let previousAiContext = '';
+    if (Array.isArray(previousAiResponses) && previousAiResponses.length > 0) {
+      const recentResponses = previousAiResponses.slice(0, 3);
+      const contextParts: string[] = [];
+      for (const resp of recentResponses) {
+        const q = typeof resp?.question === 'string' ? resp.question.trim() : '';
+        const a = typeof resp?.response === 'string' ? resp.response.trim() : '';
+        if (q.length > 0 || a.length > 0) {
+          // Truncate long responses to keep context manageable
+          const truncatedQ = q.length > 200 ? q.substring(0, 200) + '...' : q;
+          const truncatedA = a.length > 500 ? a.substring(0, 500) + '...' : a;
+          contextParts.push(`Q: ${truncatedQ || '(auto-ask)'}\nA: ${truncatedA}`);
+        }
+      }
+      if (contextParts.length > 0) {
+        previousAiContext = contextParts.join('\n\n');
+      }
     }
 
     // Support both single image (imagePngBase64) and multiple images (imagesPngBase64)
@@ -1476,10 +1496,16 @@ app.post('/ai/respond', authenticate, async (req: AuthRequest, res: Response) =>
         const enhancedPrompt = `${providedPrompt}\n\nIMPORTANT: Keep responses concise and easy to scan. Use formatting to highlight key points:\n- Use **bold** for main answers or key takeaways\n- Use bullet points (•) for tips or action items\n- Keep paragraphs short (2-3 sentences max)\n- Lead with the most important information first`;
         
         systemPrompt = enhancedPrompt;
+        
+        // Build user prompt with optional previous AI context
+        const prevContextSection = previousAiContext.length > 0 
+          ? `\n\n--- Previous AI Responses (for context) ---\n${previousAiContext}\n--- End Previous Responses ---\n`
+          : '';
+        
         if (historyText.length > 0) {
-          userPrompt = `Conversation transcript (most recent last):\n${historyText}\n\nUser question (optional): ${questionText || '(none)'}\n\nWrite your assistant reply.`;
+          userPrompt = `Conversation transcript (most recent last):\n${historyText}${prevContextSection}\n\nUser question (optional): ${questionText || '(none)'}\n\nWrite your assistant reply.`;
         } else if (questionText.length > 0) {
-          userPrompt = `User question: ${questionText}\n\nWrite your assistant reply.`;
+          userPrompt = `${prevContextSection.length > 0 ? prevContextSection + '\n' : ''}User question: ${questionText}\n\nWrite your assistant reply.`;
         } else {
           userPrompt = 'No transcript or question provided. Please provide a question or wait for the conversation to begin.';
         }
@@ -2000,14 +2026,33 @@ aiWss.on('connection', (ws: WebSocket) => {
       currentRequestId = requestId;
       cancelled = false;
 
-      const { turns, mode, question, systemPrompt: providedSystemPrompt, model: requestedModel } = data ?? {};
+      const { turns, mode, question, systemPrompt: providedSystemPrompt, model: requestedModel, previousAiResponses } = data ?? {};
       if (!Array.isArray(turns)) {
         return send({ type: 'ai_error', requestId, status: 400, message: 'Missing turns[]' });
       }
 
       const questionText = typeof question === 'string' ? question.trim() : '';
-      if (questionText.length > 800) {
-        return send({ type: 'ai_error', requestId, status: 400, message: 'Question too long (max 800 chars)' });
+      if (questionText.length > 2000) {
+        return send({ type: 'ai_error', requestId, status: 400, message: 'Question too long (max 2000 chars)' });
+      }
+      
+      // Process previous AI responses for context (up to 3 most recent)
+      let previousAiContext = '';
+      if (Array.isArray(previousAiResponses) && previousAiResponses.length > 0) {
+        const recentResponses = previousAiResponses.slice(0, 3);
+        const contextParts: string[] = [];
+        for (const resp of recentResponses) {
+          const q = typeof resp?.question === 'string' ? resp.question.trim() : '';
+          const a = typeof resp?.response === 'string' ? resp.response.trim() : '';
+          if (q.length > 0 || a.length > 0) {
+            const truncatedQ = q.length > 200 ? q.substring(0, 200) + '...' : q;
+            const truncatedA = a.length > 500 ? a.substring(0, 500) + '...' : a;
+            contextParts.push(`Q: ${truncatedQ || '(auto-ask)'}\nA: ${truncatedA}`);
+          }
+        }
+        if (contextParts.length > 0) {
+          previousAiContext = contextParts.join('\n\n');
+        }
       }
 
       // Allow empty turns if a question is provided
@@ -2095,10 +2140,16 @@ aiWss.on('connection', (ws: WebSocket) => {
           const enhancedPrompt = `${providedPrompt}\n\nIMPORTANT: Keep responses concise and easy to scan. Use formatting to highlight key points:\n- Use **bold** for main answers or key takeaways\n- Use bullet points (•) for tips or action items\n- Keep paragraphs short (2-3 sentences max)\n- Lead with the most important information first`;
           
           systemPrompt = enhancedPrompt;
+          
+          // Build user prompt with optional previous AI context
+          const prevContextSection = previousAiContext.length > 0 
+            ? `\n\n--- Previous AI Responses (for context) ---\n${previousAiContext}\n--- End Previous Responses ---\n`
+            : '';
+          
           if (historyText.length > 0) {
-            userPrompt = `Conversation transcript (most recent last):\n${historyText}\n\nUser question (optional): ${questionText || '(none)'}\n\nWrite your assistant reply.`;
+            userPrompt = `Conversation transcript (most recent last):\n${historyText}${prevContextSection}\n\nUser question (optional): ${questionText || '(none)'}\n\nWrite your assistant reply.`;
           } else if (questionText.length > 0) {
-            userPrompt = `User question: ${questionText}\n\nWrite your assistant reply.`;
+            userPrompt = `${prevContextSection.length > 0 ? prevContextSection + '\n' : ''}User question: ${questionText}\n\nWrite your assistant reply.`;
           } else {
             userPrompt = 'No transcript or question provided. Please provide a question or wait for the conversation to begin.';
           }
