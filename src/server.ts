@@ -1337,7 +1337,7 @@ app.post('/ai/respond', authenticate, async (req: AuthRequest, res: Response) =>
       });
     }
 
-    const { turns, mode, question, systemPrompt: providedSystemPrompt, model: requestedModel, imagePngBase64 } = req.body ?? {};
+    const { turns, mode, question, systemPrompt: providedSystemPrompt, model: requestedModel, imagePngBase64, imagesPngBase64 } = req.body ?? {};
     if (!Array.isArray(turns)) {
       return res.status(400).json({ error: 'Missing turns[]' });
     }
@@ -1347,12 +1347,35 @@ app.post('/ai/respond', authenticate, async (req: AuthRequest, res: Response) =>
       return res.status(400).json({ error: 'Question too long (max 800 chars)' });
     }
 
-    const screenshotBase64 = typeof imagePngBase64 === 'string' ? imagePngBase64.trim() : '';
-    const hasScreenshot = screenshotBase64.length > 0;
-    // Safety cap; overall request cap enforced by express.json({limit}).
-    if (screenshotBase64.length > 6_000_000) {
-      return res.status(400).json({ error: 'Screenshot too large' });
+    // Support both single image (imagePngBase64) and multiple images (imagesPngBase64)
+    let screenshotBase64List: string[] = [];
+    
+    // Handle array of images
+    if (Array.isArray(imagesPngBase64)) {
+      for (const img of imagesPngBase64) {
+        if (typeof img === 'string' && img.trim().length > 0) {
+          screenshotBase64List.push(img.trim());
+        }
+      }
     }
+    
+    // Handle single image (backward compatibility)
+    if (screenshotBase64List.length === 0 && typeof imagePngBase64 === 'string' && imagePngBase64.trim().length > 0) {
+      screenshotBase64List.push(imagePngBase64.trim());
+    }
+    
+    // Limit to 10 images max
+    if (screenshotBase64List.length > 10) {
+      return res.status(400).json({ error: 'Too many images (max 10)' });
+    }
+    
+    // Check total size of all images
+    const totalImageSize = screenshotBase64List.reduce((sum, img) => sum + img.length, 0);
+    if (totalImageSize > 20_000_000) {
+      return res.status(400).json({ error: 'Images too large (max 20MB total)' });
+    }
+    
+    const hasScreenshot = screenshotBase64List.length > 0;
 
     // Allow empty turns if a question is provided
     if (turns.length === 0 && questionText.length === 0 && !hasScreenshot) {
@@ -1507,15 +1530,16 @@ app.post('/ai/respond', authenticate, async (req: AuthRequest, res: Response) =>
     const maxTokens = requestMode === 'insights' ? 600 : requestMode === 'questions' ? 300 : 400;
 
     try {
-      const userMessage: any = hasScreenshot
-        ? {
-            role: 'user',
-            content: [
-              { type: 'text', text: userPrompt },
-              { type: 'image_url', image_url: { url: `data:image/png;base64,${screenshotBase64}` } },
-            ],
-          }
-        : { role: 'user', content: userPrompt };
+      let userMessage: any;
+      if (hasScreenshot) {
+        const contentParts: any[] = [{ type: 'text', text: userPrompt }];
+        for (const imgBase64 of screenshotBase64List) {
+          contentParts.push({ type: 'image_url', image_url: { url: `data:image/png;base64,${imgBase64}` } });
+        }
+        userMessage = { role: 'user', content: contentParts };
+      } else {
+        userMessage = { role: 'user', content: userPrompt };
+      }
 
       const completion = await openai.chat.completions.create({
         model,
