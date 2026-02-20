@@ -375,7 +375,7 @@ app.use('/api/admin', adminRoutes);
 app.post('/api/sessions', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { title, createdAt, updatedAt, bubbles, summary, insights, questions, mode, modeKey, metadata } = req.body;
+    const { title, createdAt, updatedAt, bubbles, summary, insights, questions, mode, modeKey, metadata, aiResponses } = req.body;
 
     if (!title || !createdAt) {
       return res.status(400).json({ error: 'Missing required fields: title, createdAt' });
@@ -397,6 +397,12 @@ app.post('/api/sessions', authenticate, async (req: AuthRequest, res: Response) 
       questions: questions ? String(questions) : null,
       modeKey: modeKey ? String(modeKey) : (mode ? String(mode) : 'general'), // Support both 'mode' and 'modeKey' for backward compatibility
       metadata: metadata && typeof metadata === 'object' ? metadata : {},
+      aiResponses: Array.isArray(aiResponses) ? aiResponses.map((r: any) => ({
+        question: String(r.question ?? ''),
+        response: String(r.response ?? ''),
+        timestamp: r.timestamp ? new Date(r.timestamp) : new Date(),
+        hasImages: Boolean(r.hasImages ?? false),
+      })) : [],
     };
 
     const sessionId = await createMeetingSession(session);
@@ -454,7 +460,7 @@ app.put('/api/sessions/:id', authenticate, async (req: AuthRequest, res: Respons
   try {
     const userId = req.user!.userId;
     const sessionId = req.params.id;
-    const { title, createdAt, updatedAt, bubbles, summary, insights, questions, mode, modeKey, metadata } = req.body;
+    const { title, createdAt, updatedAt, bubbles, summary, insights, questions, mode, modeKey, metadata, aiResponses } = req.body;
 
     // Check if sessionId is a valid MongoDB ObjectId
     const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(sessionId);
@@ -481,6 +487,12 @@ app.put('/api/sessions/:id', authenticate, async (req: AuthRequest, res: Respons
         questions: questions ? String(questions) : null,
         modeKey: modeKey ? String(modeKey) : (mode ? String(mode) : 'general'), // Support both 'mode' and 'modeKey' for backward compatibility
         metadata: metadata && typeof metadata === 'object' ? metadata : {},
+        aiResponses: Array.isArray(aiResponses) ? aiResponses.map((r: any) => ({
+          question: String(r.question ?? ''),
+          response: String(r.response ?? ''),
+          timestamp: r.timestamp ? new Date(r.timestamp) : new Date(),
+          hasImages: Boolean(r.hasImages ?? false),
+        })) : [],
       };
 
       const newSessionId = await createMeetingSession(session);
@@ -506,6 +518,14 @@ app.put('/api/sessions/:id', authenticate, async (req: AuthRequest, res: Respons
     if (modeKey !== undefined) updates.modeKey = modeKey ? String(modeKey) : 'general';
     else if (mode !== undefined) updates.modeKey = mode ? String(mode) : 'general'; // Support both 'mode' and 'modeKey' for backward compatibility
     if (metadata !== undefined) updates.metadata = metadata && typeof metadata === 'object' ? metadata : {};
+    if (aiResponses !== undefined) {
+      updates.aiResponses = Array.isArray(aiResponses) ? aiResponses.map((r: any) => ({
+        question: String(r.question ?? ''),
+        response: String(r.response ?? ''),
+        timestamp: r.timestamp ? new Date(r.timestamp) : new Date(),
+        hasImages: Boolean(r.hasImages ?? false),
+      })) : [];
+    }
 
     const success = await updateMeetingSession(sessionId, userId, updates);
     if (!success) {

@@ -98,6 +98,14 @@ export interface PaymentTransaction {
   updatedAt?: number; // Timestamp when transaction was last updated
 }
 
+// AI Response entry for session history
+export interface AiResponseEntry {
+  question: string;
+  response: string;
+  timestamp: Date | string;
+  hasImages?: boolean;
+}
+
 // Meeting Session type definition
 export interface MeetingSession {
   _id?: ObjectId;
@@ -117,6 +125,7 @@ export interface MeetingSession {
   questions?: string | null;
   modeKey?: string; // Mode key: built-in enum name (e.g. "general") or "custom:{id}" for custom modes
   metadata?: Record<string, any>;
+  aiResponses?: AiResponseEntry[]; // AI response history for this session
 }
 
 // Mode config per built-in mode (keyed by mode name, e.g. 'general', 'meeting')
@@ -439,6 +448,12 @@ const formatSessionForApi = (session: MeetingSession): any => {
       ? Object.values(rawBubbles)
       : [];
 
+  // Normalize aiResponses array
+  const rawAiResponses: any = (session as any).aiResponses;
+  const aiResponsesArray: any[] = Array.isArray(rawAiResponses)
+    ? rawAiResponses
+    : [];
+
   return {
     id: session._id?.toString() || session.id,
     title: session.title,
@@ -455,6 +470,12 @@ const formatSessionForApi = (session: MeetingSession): any => {
     questions: session.questions,
     modeKey: session.modeKey || 'general', // Default to 'general' if not set
     metadata: session.metadata || {},
+    aiResponses: aiResponsesArray.map((r: any) => ({
+      question: String(r?.question ?? ''),
+      response: String(r?.response ?? ''),
+      timestamp: formatDate(r?.timestamp ?? null),
+      hasImages: Boolean(r?.hasImages ?? false),
+    })),
   };
 };
 
